@@ -1,0 +1,6 @@
+{
+  "name": "Biryani Shop Billing & POS",
+  "description": "Fast counter POS and thermal receipt billing app for Biryani Shop with Owner dashboard, Employee counter, Bluetooth thermal printing, and daily sales reports.",
+  "requestFramePermissions": ["bluetooth"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
