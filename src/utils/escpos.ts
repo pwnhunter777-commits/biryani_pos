@@ -128,7 +128,6 @@ export function generateEscPosReceipt(bill: Bill, settings: ShopSettings): Uint8
   if (settings.footerNote) {
     addLine(settings.footerNote);
   }
-  addLine('*** HAVE A DELICIOUS MEAL ***');
 
   // Feed lines & cut
   addLine();

@@ -14,7 +14,6 @@ import { EmployeeView } from './components/EmployeeView';
 import { Language, translations, getSavedLanguage, saveLanguage } from './utils/translations';
 import { LanguageToggle } from './components/LanguageToggle';
 import { AppLogo } from './components/AppLogo';
-import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 
 export default function App() {
@@ -78,14 +77,11 @@ export default function App() {
             </div>
 
             {/* Main Title */}
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight mb-1">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight mb-4">
               {settings.shopName && settings.shopName.trim() !== ''
                 ? settings.shopName
                 : t.appName}
             </h1>
-            <p className="text-[11px] font-black text-blue-700 uppercase tracking-widest mb-4">
-              {lang === 'ta' ? 'பில்லிங் & தெர்மல் பிரிண்ட்' : 'Counter POS & Thermal Billing'}
-            </p>
 
             {/* Clean, Compact, Bold Buttons */}
             <div className="w-full max-w-xs space-y-2">
@@ -104,11 +100,6 @@ export default function App() {
               >
                 <span>{t.employeeLogin}</span>
               </button>
-
-              {/* In-App PWA Install Banner */}
-              <div className="pt-0.5">
-                <PWAInstallButton lang={lang} variant="banner" />
-              </div>
             </div>
           </div>
         )}

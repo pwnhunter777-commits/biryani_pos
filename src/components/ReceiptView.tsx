@@ -96,20 +96,16 @@ export const ReceiptView: React.FC<ReceiptViewProps> = ({
         </span>
       </div>
 
-      <div className="border-t-2 border-dashed border-black my-1" />
-
-      {/* Footer */}
-      <div className="text-center text-xs font-black text-slate-800 mt-1.5 space-y-0.5">
-        {settings.footerNote && <div>{settings.footerNote}</div>}
-        <div className="font-black">
-          {isTa ? '*** நன்றி மீண்டும் வருக ***' : '*** THANK YOU ***'}
-        </div>
-        {bill.printCount > 0 && (
-          <div className="text-[10px] text-slate-500">
-            {isTa ? 'பிரிண்ட்' : 'PRINT'} #{bill.printCount}
+      {bill.printCount > 0 && (
+        <>
+          <div className="border-t-2 border-dashed border-black my-1" />
+          <div className="text-center text-xs font-black text-slate-800 mt-1 space-y-0.5">
+            <div className="text-[10px] text-slate-500">
+              {isTa ? 'பிரிண்ட்' : 'PRINT'} #{bill.printCount}
+            </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 };
