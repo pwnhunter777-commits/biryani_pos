@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Catalog items
+    match /items/{itemId} {
+      allow read: if true;
+      allow write: if isValidId(itemId)
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.price is number
+        && request.resource.data.price >= 0;
+    }
+
+    // Customer bills
+    match /bills/{billId} {
+      allow read: if true;
+      allow create, update: if isValidId(billId)
+        && request.resource.data.billNumber is string
+        && request.resource.data.totalAmount is number
+        && request.resource.data.totalAmount >= 0;
+      allow delete: if isValidId(billId);
+    }
+
+    // Shop settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isValidId(settingId);
+    }
+
+    // Daily shared reports
+    match /dailyReports/{reportId} {
+      allow read: if true;
+      allow create, update: if isValidId(reportId)
+        && request.resource.data.dateString is string
+        && request.resource.data.totalSales is number;
+      allow delete: if isValidId(reportId);
+    }
+  }
+}

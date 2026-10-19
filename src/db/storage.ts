@@ -1,4 +1,16 @@
 import { CatalogItem, Bill, ShopSettings, BillItemSnapshot, OwnerSharedDailyReport, ItemPricingType, GramPricing, PlatePricing } from '../types';
+import {
+  saveCatalogItemToFirestore,
+  deleteCatalogItemFromFirestore,
+  saveBillToFirestore,
+  saveShopSettingsToFirestore,
+  saveDailyReportToFirestore,
+  subscribeToFirestoreItems,
+  subscribeToFirestoreBills,
+  subscribeToFirestoreSettings,
+  subscribeToFirestoreDailyReports,
+  testConnection,
+} from './firebase';
 
 const STORAGE_KEYS = {
   ITEMS: 'biryani_pos_catalog_items',
@@ -9,6 +21,7 @@ const STORAGE_KEYS = {
   LAST_BILL_SEQ: 'biryani_pos_last_bill_sequence',
   ACTIVE_SESSION: 'biryani_pos_active_session',
   LAST_DATABASE_RESET_DATE: 'biryani_pos_last_database_reset_date',
+  LAST_THREE_DAY_RESET_TIME: 'biryani_pos_last_three_day_reset_time',
 };
 
 const DEFAULT_SETTINGS: ShopSettings = {
@@ -118,6 +131,9 @@ export function addCatalogItem(
     updatedAt: Date.now(),
   };
   safeSet(STORAGE_KEYS.ITEMS, [...items, newItem]);
+  saveCatalogItemToFirestore(newItem).catch((err) => {
+    console.error('Failed to sync new item to Firebase:', err);
+  });
   return newItem;
 }
 
@@ -149,6 +165,9 @@ export function updateCatalogItem(
   const nextItems = [...items];
   nextItems[index] = updated;
   safeSet(STORAGE_KEYS.ITEMS, nextItems);
+  saveCatalogItemToFirestore(updated).catch((err) => {
+    console.error('Failed to sync updated item to Firebase:', err);
+  });
   return true;
 }
 
@@ -157,6 +176,9 @@ export function deleteCatalogItem(id: string): boolean {
   const filtered = items.filter((it) => it.id !== id);
   if (filtered.length === items.length) return false;
   safeSet(STORAGE_KEYS.ITEMS, filtered);
+  deleteCatalogItemFromFirestore(id).catch((err) => {
+    console.error('Failed to delete item from Firebase:', err);
+  });
   return true;
 }
 
@@ -234,9 +256,12 @@ export function createAndSaveBill(
     printCount: 0,
   };
 
-  // Save to Employee Phone Storage only!
+  // Save to Employee Phone Storage and sync to Firebase!
   const existingBills = safeGet<Bill[]>(STORAGE_KEYS.EMPLOYEE_PHONE_BILLS, []);
   safeSet(STORAGE_KEYS.EMPLOYEE_PHONE_BILLS, [newBill, ...existingBills]);
+  saveBillToFirestore(newBill).catch((err) => {
+    console.error('Failed to sync bill to Firebase:', err);
+  });
 
   return newBill;
 }
@@ -248,6 +273,9 @@ export function incrementBillPrintCount(billId: string): void {
     bills[index].printCount = (bills[index].printCount || 0) + 1;
     bills[index].printedAt = Date.now();
     safeSet(STORAGE_KEYS.EMPLOYEE_PHONE_BILLS, [...bills]);
+    saveBillToFirestore(bills[index]).catch((err) => {
+      console.error('Failed to sync print count to Firebase:', err);
+    });
   }
 }
 
@@ -298,6 +326,9 @@ export function saveOwnerSharedDailyReport(
 
   const existingReports = getOwnerSharedReports().filter((r) => r.dateString !== reportData.dateString);
   safeSet(STORAGE_KEYS.DATABASE_SHARED_REPORTS, [report, ...existingReports]);
+  saveDailyReportToFirestore(report).catch((err) => {
+    console.error('Failed to sync daily report to Firebase:', err);
+  });
 
   return report;
 }
@@ -311,6 +342,9 @@ export function updateShopSettings(updates: Partial<ShopSettings>): ShopSettings
   const current = getShopSettings();
   const updated: ShopSettings = { ...current, ...updates };
   safeSet(STORAGE_KEYS.SETTINGS, updated);
+  saveShopSettingsToFirestore(updated).catch((err) => {
+    console.error('Failed to sync shop settings to Firebase:', err);
+  });
   return updated;
 }
 
@@ -472,22 +506,36 @@ export function setPersistedSession(session: 'OWNER' | 'EMPLOYEE' | null): void 
   safeSet(STORAGE_KEYS.ACTIVE_SESSION, session);
 }
 
-// ================= DAILY DATABASE RESET =================
-// Automatically clears all data in the database every day when a new calendar day begins.
-// The raw bills in the employee phone itself are preserved!
-export function checkAndPerformDailyReset(): boolean {
-  const today = getTodayDateString();
-  const lastResetDate = safeGet<string | null>(STORAGE_KEYS.LAST_DATABASE_RESET_DATE, null);
+// ================= 3-DAY AUTOMATIC DATA RESET =================
+// Automatically backs up all data to Firebase and clears transaction data every 3 days.
+export function checkAndPerformThreeDayReset(): boolean {
+  const now = Date.now();
+  let lastResetTime = safeGet<number>(STORAGE_KEYS.LAST_THREE_DAY_RESET_TIME, 0);
 
-  if (!lastResetDate) {
-    safeSet(STORAGE_KEYS.LAST_DATABASE_RESET_DATE, today);
-    return false;
+  if (!lastResetTime) {
+    const legacyDate = safeGet<string | null>(STORAGE_KEYS.LAST_DATABASE_RESET_DATE, null);
+    if (legacyDate) {
+      lastResetTime = new Date(legacyDate).getTime() || now;
+    } else {
+      lastResetTime = now;
+    }
+    safeSet(STORAGE_KEYS.LAST_THREE_DAY_RESET_TIME, lastResetTime);
   }
 
-  if (lastResetDate !== today) {
-    // A new day has started: Clear the database shared data for a fresh clean day!
+  const elapsedMs = now - lastResetTime;
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+
+  if (elapsedMs >= threeDaysMs) {
+    // 3 days have passed: backup everything to Firebase first!
+    syncAllDataToFirebase().catch((err) => {
+      console.error('Backup to Firebase failed before 3-day clear:', err);
+    });
+
+    // Clear transactional bills & shared reports for a fresh 3-day cycle
     safeSet(STORAGE_KEYS.DATABASE_SHARED_REPORTS, []);
-    safeSet(STORAGE_KEYS.LAST_DATABASE_RESET_DATE, today);
+    safeSet(STORAGE_KEYS.EMPLOYEE_PHONE_BILLS, []);
+    safeSet(STORAGE_KEYS.LAST_THREE_DAY_RESET_TIME, now);
+    safeSet(STORAGE_KEYS.LAST_DATABASE_RESET_DATE, getTodayDateString());
     notifyListeners();
     return true;
   }
@@ -495,14 +543,160 @@ export function checkAndPerformDailyReset(): boolean {
   return false;
 }
 
+// Backwards-compatibility alias
+export function checkAndPerformDailyReset(): boolean {
+  return checkAndPerformThreeDayReset();
+}
+
+// 3-Day cycle status info helper
+export function getThreeDayResetInfo(): { daysElapsed: number; daysRemaining: number } {
+  const now = Date.now();
+  const lastResetTime = safeGet<number>(STORAGE_KEYS.LAST_THREE_DAY_RESET_TIME, now);
+  const elapsedMs = Math.max(0, now - lastResetTime);
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  const daysElapsed = Math.floor(elapsedMs / oneDayMs) + 1;
+  const daysRemaining = Math.max(0, 3 - Math.floor(elapsedMs / oneDayMs));
+  return {
+    daysElapsed: Math.min(3, Math.max(1, daysElapsed)),
+    daysRemaining,
+  };
+}
+
 // Explicit Owner / System clear of the database shared data
 export function clearDatabaseDailyData(): void {
+  // Sync to Firebase before clearing
+  syncAllDataToFirebase().catch(() => {});
   safeSet(STORAGE_KEYS.DATABASE_SHARED_REPORTS, []);
   safeSet(STORAGE_KEYS.LAST_DATABASE_RESET_DATE, getTodayDateString());
+  safeSet(STORAGE_KEYS.LAST_THREE_DAY_RESET_TIME, Date.now());
   notifyListeners();
 }
 
 // Helper to get count of bills stored on employee phone
 export function getEmployeePhoneBillsCount(): number {
   return getEmployeePhoneBills().length;
+}
+
+// ================= FIREBASE CLOUD SYNC ENGINE =================
+
+function safeSetWithoutNotify<T>(key: string, value: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.error(`Error saving ${key} to storage:`, e);
+  }
+}
+
+let isFirebaseSyncInitialized = false;
+
+export function initFirebaseSync(): void {
+  if (isFirebaseSyncInitialized) return;
+  isFirebaseSyncInitialized = true;
+
+  // Test Firestore connection on boot
+  testConnection().then((connected) => {
+    if (connected) {
+      console.log('Firebase Firestore is connected and ready to sync.');
+    }
+  }).catch(() => {});
+
+  // 1. Initial push of local data to Firebase if any
+  try {
+    const localItems = getCatalogItems();
+    if (localItems.length > 0) {
+      localItems.forEach((item) => {
+        saveCatalogItemToFirestore(item).catch(() => {});
+      });
+    }
+
+    const localBills = getEmployeePhoneBills();
+    if (localBills.length > 0) {
+      localBills.forEach((bill) => {
+        saveBillToFirestore(bill).catch(() => {});
+      });
+    }
+
+    const localSettings = getShopSettings();
+    if (localSettings.shopName) {
+      saveShopSettingsToFirestore(localSettings).catch(() => {});
+    }
+
+    const localReports = getOwnerSharedReports();
+    if (localReports.length > 0) {
+      localReports.forEach((rep) => {
+        saveDailyReportToFirestore(rep).catch(() => {});
+      });
+    }
+  } catch (err) {
+    console.error('Initial Firebase upload error:', err);
+  }
+
+  // 2. Real-time Listeners from Firebase Firestore
+  try {
+    subscribeToFirestoreItems((firestoreItems) => {
+      if (firestoreItems && Array.isArray(firestoreItems) && firestoreItems.length > 0) {
+        const local = getCatalogItems();
+        const map = new Map(local.map((i) => [i.id, i]));
+        firestoreItems.forEach((item) => {
+          map.set(item.id, item);
+        });
+        safeSetWithoutNotify(STORAGE_KEYS.ITEMS, Array.from(map.values()));
+        notifyListeners();
+      }
+    });
+
+    subscribeToFirestoreBills((firestoreBills) => {
+      if (firestoreBills && Array.isArray(firestoreBills) && firestoreBills.length > 0) {
+        const local = getEmployeePhoneBills();
+        const map = new Map(local.map((b) => [b.id, b]));
+        firestoreBills.forEach((b) => {
+          map.set(b.id, b);
+        });
+        const sorted = Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
+        safeSetWithoutNotify(STORAGE_KEYS.EMPLOYEE_PHONE_BILLS, sorted);
+        notifyListeners();
+      }
+    });
+
+    subscribeToFirestoreSettings((firestoreSettings) => {
+      if (firestoreSettings && firestoreSettings.shopName) {
+        safeSetWithoutNotify(STORAGE_KEYS.SETTINGS, firestoreSettings);
+        notifyListeners();
+      }
+    });
+
+    subscribeToFirestoreDailyReports((firestoreReports) => {
+      if (firestoreReports && Array.isArray(firestoreReports) && firestoreReports.length > 0) {
+        const local = getOwnerSharedReports();
+        const map = new Map(local.map((r) => [r.id, r]));
+        firestoreReports.forEach((r) => {
+          map.set(r.id, r);
+        });
+        safeSetWithoutNotify(STORAGE_KEYS.DATABASE_SHARED_REPORTS, Array.from(map.values()));
+        notifyListeners();
+      }
+    });
+  } catch (err) {
+    console.error('Error attaching Firebase listeners:', err);
+  }
+}
+
+// Explicit manual trigger to force upload all local records to Firebase
+export async function syncAllDataToFirebase(): Promise<{ itemsCount: number; billsCount: number }> {
+  const items = getCatalogItems();
+  const bills = getEmployeePhoneBills();
+  const settings = getShopSettings();
+  const reports = getOwnerSharedReports();
+
+  await Promise.allSettled([
+    ...items.map((it) => saveCatalogItemToFirestore(it)),
+    ...bills.map((b) => saveBillToFirestore(b)),
+    saveShopSettingsToFirestore(settings),
+    ...reports.map((r) => saveDailyReportToFirestore(r)),
+  ]);
+
+  return {
+    itemsCount: items.length,
+    billsCount: bills.length,
+  };
 }

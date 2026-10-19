@@ -14,6 +14,8 @@ import {
   clearDatabaseDailyData,
   getLast7DaysSalesData,
   DailySalesDataPoint,
+  syncAllDataToFirebase,
+  getThreeDayResetInfo,
 } from '../db/storage';
 import { CatalogItem, ShopSettings, Bill } from '../types';
 import {
@@ -32,6 +34,7 @@ import {
   Smartphone,
   TrendingUp,
   Scale,
+  Cloud,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -88,6 +91,29 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
 
   // Search in bills
   const [billSearchQuery, setBillSearchQuery] = useState('');
+
+  // Firebase Cloud Sync
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const handleSyncCloud = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await syncAllDataToFirebase();
+      setSyncMessage(
+        isTa
+          ? `Firebase-ல் வெற்றிகரமாக சேமிக்கப்பட்டது (${res.itemsCount} உணவுகள், ${res.billsCount} பில்கள்)`
+          : `Saved to Firebase successfully (${res.itemsCount} items, ${res.billsCount} bills)`
+      );
+      setTimeout(() => setSyncMessage(null), 4000);
+    } catch (err) {
+      console.error(err);
+      setSyncMessage(isTa ? 'Firebase ஒத்திசைவு பிழை' : 'Firebase sync error');
+      setTimeout(() => setSyncMessage(null), 4000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Reload data from storage
   const reloadData = () => {
@@ -169,6 +195,17 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* Firebase Cloud Sync Button */}
+            <button
+              onClick={handleSyncCloud}
+              disabled={isSyncing}
+              title={isTa ? 'எல்லா தரவையும் Firebase-ல் சேமிக்கவும்' : 'Save all data in Firebase'}
+              className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 text-xs font-black flex items-center gap-1 transition cursor-pointer disabled:opacity-50 uppercase"
+            >
+              <Cloud className={`w-3.5 h-3.5 stroke-[2.5] ${isSyncing ? 'animate-pulse text-amber-600' : 'text-blue-600'}`} />
+              <span className="hidden sm:inline">{isSyncing ? (isTa ? 'சேமிக்கிறது...' : 'Syncing...') : 'Firebase'}</span>
+            </button>
+
             {onLanguageChange && (
               <LanguageToggle currentLang={lang} onLanguageChange={onLanguageChange} />
             )}
@@ -181,6 +218,19 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Sync Toast Notification */}
+        {syncMessage && (
+          <div className="mt-1 px-3 py-1 bg-emerald-600 text-white text-xs font-black rounded flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-1">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />
+              <span>{syncMessage}</span>
+            </div>
+            <button onClick={() => setSyncMessage(null)} className="text-emerald-100 hover:text-white p-0.5">
+              <X className="w-3 h-3 stroke-[3]" />
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Tabs - Small Compact Bar with Bold Labels */}
@@ -370,9 +420,22 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
           <div className="space-y-2">
             {/* Header & Date Selector - Compact */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 bg-white border border-blue-200 p-2 rounded-lg shadow-xs">
-              <h2 className="text-base font-black text-slate-900 uppercase">
-                {t.salesSummaryAndReports}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-slate-900 uppercase">
+                  {t.salesSummaryAndReports}
+                </h2>
+                {(() => {
+                  const rInfo = getThreeDayResetInfo();
+                  return (
+                    <span className="text-[10px] sm:text-[11px] font-black text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+                      {isTa
+                        ? `3-நாள் சுழற்சி: நாள் ${rInfo.daysElapsed}/3 (தானியங்கி நீக்கம்)`
+                        : `3-Day Cycle: Day ${rInfo.daysElapsed} of 3 (Auto-clears)`}
+                    </span>
+                  );
+                })()}
+              </div>
 
               {/* Date Filter & Clear Daily Data */}
               <div className="flex flex-wrap items-center gap-1.5 shrink-0">

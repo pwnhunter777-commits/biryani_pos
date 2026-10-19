@@ -5,7 +5,7 @@ import { Language, translations } from '../utils/translations';
 interface PinPadProps {
   title: string;
   subtitle?: string;
-  expectedPin?: string;
+  expectedPin?: string | string[];
   onSuccess: () => void;
   onCancel?: () => void;
   maxDigits?: number;
@@ -33,7 +33,11 @@ export const PinPad: React.FC<PinPadProps> = ({
 
     if (nextPin.length === maxDigits) {
       if (expectedPin) {
-        if (nextPin === expectedPin) {
+        const isValid = Array.isArray(expectedPin)
+          ? expectedPin.includes(nextPin)
+          : nextPin === expectedPin;
+
+        if (isValid) {
           setTimeout(() => {
             onSuccess();
           }, 150);

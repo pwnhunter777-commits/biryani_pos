@@ -30,6 +30,7 @@ import {
   Check,
   Scale,
   Utensils,
+  Cloud,
 } from 'lucide-react';
 import { ReceiptView } from './ReceiptView';
 import { BluetoothModal } from './BluetoothModal';
@@ -43,6 +44,7 @@ import {
 import { Language, translations } from '../utils/translations';
 import { LanguageToggle } from './LanguageToggle';
 import { AppLogo } from './AppLogo';
+import { PinPad } from './PinPad';
 
 interface EmployeeViewProps {
   onLogout: () => void;
@@ -101,6 +103,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
   // Bluetooth Modal State
   const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isLogoutPinModalOpen, setIsLogoutPinModalOpen] = useState(false);
   const [bluetoothState, setBluetoothState] = useState({
     isConnected: false,
     deviceName: null as string | null,
@@ -214,6 +217,28 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
 
       return next;
     });
+  };
+
+  // Toggle portion logic:
+  // "In the food area in the employee side, for the fixed price food, give in square. If I click it, it must add. If I re-click it, it must remove from the bill. For the plating, keep it the same.
+  // And same for the plating and waiting type food. If I click any gram, it must add. If I re-click it, it must remove from the bill, not add another plate."
+  const handleTogglePortion = (item: CatalogItem, variantKey: string = 'fixed') => {
+    const cartKey = `${item.id}_${variantKey}`;
+    const altFixedKey = variantKey === 'fixed' ? item.id : null;
+    const existing = cartMap[cartKey] || (altFixedKey ? cartMap[altFixedKey] : undefined);
+
+    if (existing && existing.quantity > 0) {
+      // If I re-click it, it must remove from the bill!
+      setCartMap((prev) => {
+        const next = { ...prev };
+        delete next[cartKey];
+        if (altFixedKey) delete next[altFixedKey];
+        return next;
+      });
+    } else {
+      // If I click it, it must add to the bill
+      handleAddPortion(item, variantKey);
+    }
   };
 
   const handleDecrementPortion = (cartKey: string) => {
@@ -342,20 +367,15 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <AppLogo size="sm" />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="font-black text-sm tracking-wide text-slate-900 uppercase">
-                  {settings.shopName && settings.shopName.trim() !== ''
-                    ? settings.shopName
-                    : t.appName}
-                </h1>
-                <span className="text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-300 px-1.5 py-0.2 rounded uppercase">
-                  {t.cashier}
-                </span>
-              </div>
-              <p className="text-[11px] font-bold text-slate-500">
-                {currentPage === 'BILLING' ? t.page1Billing : t.page2History}
-              </p>
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-black text-sm tracking-wide text-slate-900 uppercase">
+                {settings.shopName && settings.shopName.trim() !== ''
+                  ? settings.shopName
+                  : t.appName}
+              </h1>
+              <span className="text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-300 px-1.5 py-0.2 rounded uppercase">
+                {t.cashier}
+              </span>
             </div>
           </div>
 
@@ -395,9 +415,9 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
               </span>
             </button>
 
-            {/* Logout / Lock */}
+            {/* Logout / Lock - Asks for Password / PIN */}
             <button
-              onClick={onLogout}
+              onClick={() => setIsLogoutPinModalOpen(true)}
               className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 border border-slate-300 text-xs font-black flex items-center gap-1 transition cursor-pointer uppercase"
               title={t.lock}
             >
@@ -488,291 +508,170 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {items.map((item) => {
-                  const itemVariantsInCart = selectedCartItems.filter((e) => e.itemId === item.id);
-                  const itemTotalQtyInCart = itemVariantsInCart.reduce((sum, e) => sum + e.quantity, 0);
-                  const itemTotalAmountInCart = itemVariantsInCart.reduce((sum, e) => sum + e.lineTotal, 0);
+              <div className="space-y-2.5">
+                {/* 1. Gram / Weight Foods */}
+                {items.some((i) => i.pricingType === 'gram') && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {items
+                      .filter((i) => i.pricingType === 'gram')
+                      .map((item) => {
+                        const portions = [
+                          { key: '100g', label: '100gm', price: item.gramPrices?.p100g ?? item.price },
+                          { key: '250g', label: '250gm', price: item.gramPrices?.p250g ?? (item.gramPrices?.p200g ? Math.round(item.gramPrices.p200g * 1.25) : Math.round(item.price * 2.5)) },
+                          { key: '500g', label: '500gm', price: item.gramPrices?.p500g ?? Math.round(item.price * 5) },
+                          { key: '1kg', label: '1 KG', price: item.gramPrices?.p1kg ?? Math.round(item.price * 10) },
+                        ];
 
-                  // CASE 1: GRAM / WEIGHT TYPE (100g, 200g, 500g, 1kg)
-                  if (item.pricingType === 'gram') {
-                    const portions = [
-                      { key: '100g', label: '100gm', price: item.gramPrices?.p100g ?? item.price },
-                      { key: '250g', label: '250gm', price: item.gramPrices?.p250g ?? (item.gramPrices?.p200g ? Math.round(item.gramPrices.p200g * 1.25) : Math.round(item.price * 2.5)) },
-                      { key: '500g', label: '500gm', price: item.gramPrices?.p500g ?? Math.round(item.price * 5) },
-                      { key: '1kg', label: '1 KG', price: item.gramPrices?.p1kg ?? Math.round(item.price * 10) },
-                    ];
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`p-2.5 rounded-xl border-2 transition-all flex flex-col justify-between shadow-xs select-none ${
-                          itemTotalQtyInCart > 0
-                            ? 'bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/40 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20'
-                            : 'bg-white border-slate-200/90 hover:border-emerald-400 hover:shadow-xs'
-                        }`}
-                      >
-                        <div>
-                          {/* Title and Badges */}
-                          <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                            <h4 className="font-black text-slate-900 text-sm sm:text-base leading-tight uppercase truncate">
-                              {item.name}
-                            </h4>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
-                                {t.gramType}
-                              </span>
-                              {itemTotalQtyInCart > 0 && (
-                                <span className="inline-flex items-center gap-0.5 bg-emerald-600 text-white font-black text-[11px] px-2 py-0.5 rounded-full shadow-xs">
-                                  <Check className="w-3 h-3 stroke-[3]" />
-                                  <span>{itemTotalQtyInCart}</span>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* 4 Gram Selection Buttons (100g, 200g, 500g, 1kg) */}
-                          <div className="grid grid-cols-2 gap-1.5 mt-2">
-                            {portions.map((g) => {
-                              const cartKey = `${item.id}_${g.key}`;
-                              const q = cartMap[cartKey]?.quantity || 0;
-                              return (
-                                <button
-                                  key={g.key}
-                                  type="button"
-                                  onClick={() => handleAddPortion(item, g.key)}
-                                  className={`p-1.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer active:scale-95 ${
-                                    q > 0
-                                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                                      : 'bg-emerald-50/80 hover:bg-emerald-100/80 text-emerald-950 border-emerald-200'
-                                  }`}
-                                >
-                                  <div className="min-w-0">
-                                    <div className={`font-black text-xs leading-none ${q > 0 ? 'text-white' : 'text-emerald-900'}`}>
-                                      {g.label}
-                                    </div>
-                                    <div className={`text-[11px] font-mono font-black mt-0.5 ${q > 0 ? 'text-emerald-100' : 'text-emerald-700'}`}>
-                                      {isTa ? 'ரூ.' : 'Rs.'} {g.price}
-                                    </div>
-                                  </div>
-                                  {q > 0 ? (
-                                    <span className="w-5 h-5 rounded-full bg-white text-emerald-800 text-[11px] font-mono font-black flex items-center justify-center shrink-0 ml-1">
-                                      {q}
-                                    </span>
-                                  ) : (
-                                    <Plus className="w-3.5 h-3.5 text-emerald-600 shrink-0 stroke-[3] ml-1" />
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {itemTotalQtyInCart > 0 && (
-                          <div className="mt-2 pt-1.5 border-t border-emerald-100 flex items-center justify-between text-xs font-mono">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">
-                              {isTa ? 'மொத்தம்' : 'Subtotal'}:
-                            </span>
-                            <span className="font-black text-emerald-800">
-                              {isTa ? 'ரூ.' : 'Rs.'} {itemTotalAmountInCart.toFixed(0)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // CASE 2: PLATE / SERVINGS TYPE (1, 2, 3, 4 Plates)
-                  if (item.pricingType === 'plate') {
-                    const plates = [
-                      { key: 'plate1', label: isTa ? '1 தட்டு' : '1 Plate', price: item.platePrices?.plate1 ?? item.price },
-                      { key: 'plate2', label: isTa ? '2 தட்டு' : '2 Plate', price: item.platePrices?.plate2 ?? (item.price * 2) },
-                      { key: 'plate3', label: isTa ? '3 தட்டு' : '3 Plate', price: item.platePrices?.plate3 ?? (item.price * 3) },
-                      { key: 'plate4', label: isTa ? '4 தட்டு' : '4 Plate', price: item.platePrices?.plate4 ?? (item.price * 4) },
-                    ];
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`p-2.5 rounded-xl border-2 transition-all flex flex-col justify-between shadow-xs select-none ${
-                          itemTotalQtyInCart > 0
-                            ? 'bg-gradient-to-br from-indigo-50/90 via-white to-blue-50/40 border-indigo-500 shadow-sm ring-2 ring-indigo-500/20'
-                            : 'bg-white border-slate-200/90 hover:border-indigo-400 hover:shadow-xs'
-                        }`}
-                      >
-                        <div>
-                          {/* Title and Badges */}
-                          <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                            <h4 className="font-black text-slate-900 text-sm sm:text-base leading-tight uppercase truncate">
-                              {item.name}
-                            </h4>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="text-[10px] font-black uppercase text-indigo-800 bg-indigo-100 border border-indigo-300 px-1.5 py-0.5 rounded">
-                                {t.plateType}
-                              </span>
-                              {itemTotalQtyInCart > 0 && (
-                                <span className="inline-flex items-center gap-0.5 bg-indigo-600 text-white font-black text-[11px] px-2 py-0.5 rounded-full shadow-xs">
-                                  <Check className="w-3 h-3 stroke-[3]" />
-                                  <span>{itemTotalQtyInCart}</span>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* 4 Plate Selection Buttons */}
-                          <div className="grid grid-cols-2 gap-1.5 mt-2">
-                            {plates.map((p) => {
-                              const cartKey = `${item.id}_${p.key}`;
-                              const q = cartMap[cartKey]?.quantity || 0;
-                              return (
-                                <button
-                                  key={p.key}
-                                  type="button"
-                                  onClick={() => handleAddPortion(item, p.key)}
-                                  className={`p-1.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer active:scale-95 ${
-                                    q > 0
-                                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                                      : 'bg-indigo-50/80 hover:bg-indigo-100/80 text-indigo-950 border-indigo-200'
-                                  }`}
-                                >
-                                  <div className="min-w-0">
-                                    <div className={`font-black text-xs leading-none ${q > 0 ? 'text-white' : 'text-indigo-900'}`}>
-                                      {p.label}
-                                    </div>
-                                    <div className={`text-[11px] font-mono font-black mt-0.5 ${q > 0 ? 'text-indigo-100' : 'text-indigo-700'}`}>
-                                      {isTa ? 'ரூ.' : 'Rs.'} {p.price}
-                                    </div>
-                                  </div>
-                                  {q > 0 ? (
-                                    <span className="w-5 h-5 rounded-full bg-white text-indigo-800 text-[11px] font-mono font-black flex items-center justify-center shrink-0 ml-1">
-                                      {q}
-                                    </span>
-                                  ) : (
-                                    <Plus className="w-3.5 h-3.5 text-indigo-600 shrink-0 stroke-[3] ml-1" />
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {itemTotalQtyInCart > 0 && (
-                          <div className="mt-2 pt-1.5 border-t border-indigo-100 flex items-center justify-between text-xs font-mono">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">
-                              {isTa ? 'மொத்தம்' : 'Subtotal'}:
-                            </span>
-                            <span className="font-black text-indigo-800">
-                              {isTa ? 'ரூ.' : 'Rs.'} {itemTotalAmountInCart.toFixed(0)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // CASE 3: FIXED PRICE TYPE
-                  const fixedCartKey = `${item.id}_fixed`;
-                  const fixedEntry = cartMap[fixedCartKey] || cartMap[item.id];
-                  const fixedQty = fixedEntry?.quantity || 0;
-                  const itemSubtotal = item.price * fixedQty;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className={`p-2.5 rounded-xl border-2 transition-all duration-150 relative overflow-hidden flex flex-col justify-between shadow-xs select-none ${
-                        fixedQty > 0
-                          ? 'bg-gradient-to-br from-blue-50/95 via-white to-blue-50/50 border-blue-600 shadow-md ring-2 ring-blue-500/20'
-                          : 'bg-white border-slate-200/90 hover:border-blue-400 hover:shadow-xs'
-                      }`}
-                    >
-                      {/* Top Tap Target */}
-                      <div
-                        onClick={() => handleAddPortion(item, 'fixed')}
-                        className="cursor-pointer group/card pb-1.5"
-                        title={isTa ? 'சேர்க்க தட்டவும்' : 'Tap to add'}
-                      >
-                        <div className="flex items-start justify-between gap-1.5 mb-1">
-                          <h4 className="font-black text-slate-900 text-sm sm:text-base leading-tight uppercase truncate">
-                            {item.name}
-                          </h4>
-
-                          {fixedQty > 0 && (
-                            <span className="inline-flex items-center gap-0.5 bg-blue-600 text-white font-black text-[11px] px-2 py-0.5 rounded-full shadow-xs shrink-0 animate-in fade-in zoom-in-95">
-                              <Check className="w-3 h-3 stroke-[3]" />
-                              <span>{fixedQty}</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Price & Subtotal Line */}
-                        <div className="flex items-baseline justify-between mt-1 px-0.5">
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                              {isTa ? 'விலை' : 'Price'}
-                            </span>
-                            <span className="text-blue-700 font-black text-lg sm:text-xl font-mono">
-                              {isTa ? 'ரூ.' : 'Rs.'} {item.price.toFixed(0)}
-                            </span>
-                          </div>
-
-                          {fixedQty > 0 && (
-                            <span className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md font-mono shadow-2xs">
-                              = {isTa ? 'ரூ.' : 'Rs.'} {itemSubtotal.toFixed(0)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Bottom Action: Add Button (if 0) or Tactile Stepper (if > 0) */}
-                      <div className="pt-1.5 border-t border-slate-200/80 mt-0.5">
-                        {fixedQty === 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => handleAddPortion(item, 'fixed')}
-                            className="w-full py-1.5 px-2 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white font-black text-xs uppercase flex items-center justify-center gap-1.5 border border-blue-200 hover:border-blue-600 transition-all cursor-pointer active:scale-98 shadow-2xs"
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-2 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between select-none"
                           >
-                            <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                            <span>{isTa ? 'சேர்' : 'Add to Bill'}</span>
-                          </button>
-                        ) : (
-                          <div className="flex items-center justify-between bg-slate-100 rounded-lg p-0.5 border border-slate-300">
-                            {/* Minus Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleDecrementPortion(fixedEntry?.cartKey || `${item.id}_fixed`)}
-                              className="w-8 h-8 rounded-md bg-white hover:bg-red-50 hover:text-red-700 active:scale-95 text-slate-800 font-black border border-slate-300 hover:border-red-300 flex items-center justify-center transition-all cursor-pointer shadow-xs"
-                              aria-label="Decrease quantity"
-                              title={isTa ? 'குறைக்க' : 'Decrease'}
-                            >
-                              <Minus className="w-4 h-4 stroke-[3]" />
-                            </button>
+                            <h4 className="font-black text-slate-900 text-sm uppercase leading-tight mb-1.5 truncate">
+                              {item.name}
+                            </h4>
 
-                            {/* Center Count Badge */}
-                            <div className="flex flex-col items-center justify-center px-3">
-                              <span className="text-center font-black font-mono text-lg text-slate-900 leading-none">
-                                {fixedQty}
-                              </span>
-                              <span className="text-[9px] font-bold text-slate-400 uppercase leading-tight">
-                                {isTa ? 'பங்கு' : 'Qty'}
-                              </span>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {portions.map((g) => {
+                                const cartKey = `${item.id}_${g.key}`;
+                                const isAdded = (cartMap[cartKey]?.quantity || 0) > 0;
+                                return (
+                                  <button
+                                    key={g.key}
+                                    type="button"
+                                    onClick={() => handleTogglePortion(item, g.key)}
+                                    className={`p-1.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer active:scale-95 ${
+                                      isAdded
+                                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                                        : 'bg-emerald-50/70 hover:bg-emerald-100 text-emerald-950 border-emerald-200'
+                                    }`}
+                                  >
+                                    <div className="min-w-0">
+                                      <div className={`font-black text-xs leading-none ${isAdded ? 'text-white' : 'text-emerald-900'}`}>
+                                        {g.label}
+                                      </div>
+                                      <div className={`text-[11px] font-mono font-black mt-0.5 ${isAdded ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                                        {isTa ? 'ரூ.' : 'Rs.'} {g.price}
+                                      </div>
+                                    </div>
+                                    {isAdded && (
+                                      <Check className="w-3.5 h-3.5 stroke-[3.5] text-white shrink-0 ml-1" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* 2. Plating Foods */}
+                {items.some((i) => i.pricingType === 'plate') && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {items
+                      .filter((i) => i.pricingType === 'plate')
+                      .map((item) => {
+                        const plates = [
+                          { key: 'plate1', label: isTa ? '1 தட்டு' : '1 Plate', price: item.platePrices?.plate1 ?? item.price },
+                          { key: 'plate2', label: isTa ? '2 தட்டு' : '2 Plate', price: item.platePrices?.plate2 ?? (item.price * 2) },
+                          { key: 'plate3', label: isTa ? '3 தட்டு' : '3 Plate', price: item.platePrices?.plate3 ?? (item.price * 3) },
+                          { key: 'plate4', label: isTa ? '4 தட்டு' : '4 Plate', price: item.platePrices?.plate4 ?? (item.price * 4) },
+                        ];
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-2 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between select-none"
+                          >
+                            <h4 className="font-black text-slate-900 text-sm uppercase leading-tight mb-1.5 truncate">
+                              {item.name}
+                            </h4>
+
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {plates.map((p) => {
+                                const cartKey = `${item.id}_${p.key}`;
+                                const isAdded = (cartMap[cartKey]?.quantity || 0) > 0;
+                                return (
+                                  <button
+                                    key={p.key}
+                                    type="button"
+                                    onClick={() => handleTogglePortion(item, p.key)}
+                                    className={`p-1.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer active:scale-95 ${
+                                      isAdded
+                                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                                        : 'bg-indigo-50/70 hover:bg-indigo-100 text-indigo-950 border-indigo-200'
+                                    }`}
+                                  >
+                                    <div className="min-w-0">
+                                      <div className={`font-black text-xs leading-none ${isAdded ? 'text-white' : 'text-indigo-900'}`}>
+                                        {p.label}
+                                      </div>
+                                      <div className={`text-[11px] font-mono font-black mt-0.5 ${isAdded ? 'text-indigo-100' : 'text-indigo-700'}`}>
+                                        {isTa ? 'ரூ.' : 'Rs.'} {p.price}
+                                      </div>
+                                    </div>
+                                    {isAdded && (
+                                      <Check className="w-3.5 h-3.5 stroke-[3.5] text-white shrink-0 ml-1" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* 3. Fixed Price Foods - Square Tiles */}
+                {items.some((i) => i.pricingType === 'fixed' || !i.pricingType) && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {items
+                      .filter((i) => i.pricingType === 'fixed' || !i.pricingType)
+                      .map((item) => {
+                        const fixedCartKey = `${item.id}_fixed`;
+                        const fixedEntry = cartMap[fixedCartKey] || cartMap[item.id];
+                        const isAdded = (fixedEntry?.quantity || 0) > 0;
+
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleTogglePortion(item, 'fixed')}
+                            className={`aspect-square w-full rounded-xl border-2 p-2 flex flex-col justify-between items-center text-center cursor-pointer select-none active:scale-95 transition ${
+                              isAdded
+                                ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-400'
+                                : 'bg-white border-slate-300 text-slate-900 hover:border-blue-400 hover:bg-blue-50/40 shadow-xs'
+                            }`}
+                          >
+                            <div className="w-full flex justify-end">
+                              {isAdded ? (
+                                <span className="w-4 h-4 rounded-full bg-white text-blue-700 flex items-center justify-center text-[10px] font-black shadow-2xs">
+                                  <Check className="w-3 h-3 stroke-[3.5]" />
+                                </span>
+                              ) : (
+                                <span className="w-4 h-4" />
+                              )}
                             </div>
 
-                            {/* Plus Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleAddPortion(item, 'fixed')}
-                              className="w-8 h-8 rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black flex items-center justify-center transition-all shadow-xs cursor-pointer"
-                              aria-label="Increase quantity"
-                              title={isTa ? 'அதிகரிக்க' : 'Increase'}
+                            <h4 className="font-black text-xs sm:text-sm uppercase leading-snug px-1 line-clamp-2">
+                              {item.name}
+                            </h4>
+
+                            <div
+                              className={`font-mono font-black text-sm sm:text-base ${
+                                isAdded ? 'text-amber-200' : 'text-blue-700'
+                              }`}
                             >
-                              <Plus className="w-4 h-4 stroke-[3]" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                              {isTa ? 'ரூ.' : 'Rs.'} {item.price.toFixed(0)}
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1169,6 +1068,25 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
         onSave={reloadData}
         lang={lang}
       />
+
+      {/* ================= MODAL: EMPLOYEE LOGOUT CONFIRMATION WITH PIN ================= */}
+      {isLogoutPinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
+          <div className="w-full max-w-xs">
+            <PinPad
+              title={isTa ? 'பணியாளர் வெளியேறுதல்' : 'Employee Logout'}
+              subtitle={isTa ? 'வெளியேற கடவுச்சொல்லை உள்ளிடவும்' : 'Enter PIN / Password to Logout'}
+              expectedPin={[settings.employeePin || employeePin || '1234', settings.ownerPin || '8888']}
+              onSuccess={() => {
+                setIsLogoutPinModalOpen(false);
+                onLogout();
+              }}
+              onCancel={() => setIsLogoutPinModalOpen(false)}
+              lang={lang}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

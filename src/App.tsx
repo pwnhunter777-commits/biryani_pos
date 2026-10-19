@@ -5,7 +5,8 @@ import {
   subscribeToStore,
   getPersistedSession,
   setPersistedSession,
-  checkAndPerformDailyReset,
+  checkAndPerformThreeDayReset,
+  syncAllDataToFirebase,
 } from './db/storage';
 import { ShopSettings, ScreenState } from './types';
 import { PinPad } from './components/PinPad';
@@ -19,10 +20,13 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 export default function App() {
   const [lang, setLang] = useState<Language>(() => getSavedLanguage());
   const [screen, setScreen] = useState<ScreenState>(() => {
-    checkAndPerformDailyReset();
+    checkAndPerformThreeDayReset();
     const session = getPersistedSession();
     if (session === 'OWNER') {
       return 'OWNER_DASHBOARD';
+    }
+    if (session === 'EMPLOYEE') {
+      return 'EMPLOYEE_SECTION';
     }
     return 'OPENING_SCREEN';
   });
@@ -37,7 +41,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    checkAndPerformDailyReset();
+    checkAndPerformThreeDayReset();
     const unsub = subscribeToStore(() => {
       setSettings(getShopSettings());
     });
@@ -50,11 +54,18 @@ export default function App() {
   };
 
   const handleEmployeeLoginSuccess = () => {
+    setPersistedSession('EMPLOYEE');
     setVerifiedEmployeePin(settings.employeePin || '1234');
     setScreen('EMPLOYEE_SECTION');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Till the person is logouting, save all data in Firebase
+    try {
+      await syncAllDataToFirebase();
+    } catch (err) {
+      console.error('Logout Firebase sync error:', err);
+    }
     setPersistedSession(null);
     setScreen('OPENING_SCREEN');
   };
