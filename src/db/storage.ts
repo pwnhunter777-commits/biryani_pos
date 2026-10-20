@@ -171,14 +171,39 @@ export function updateCatalogItem(
   return true;
 }
 
-export function deleteCatalogItem(id: string): boolean {
+export function updateCatalogItemPrice(id: string, newPrice: number): boolean {
+  const items = getCatalogItems();
+  const index = items.findIndex((it) => it.id === id);
+  if (index === -1) return false;
+
+  const current = items[index];
+  const validPrice = Math.max(0, Number(newPrice));
+  const updated: CatalogItem = {
+    ...current,
+    price: validPrice,
+    updatedAt: Date.now(),
+  };
+
+  const nextItems = [...items];
+  nextItems[index] = updated;
+  safeSet(STORAGE_KEYS.ITEMS, nextItems);
+  saveCatalogItemToFirestore(updated).catch((err) => {
+    console.error('Failed to sync updated item price to Firebase:', err);
+  });
+  return true;
+}
+
+export async function deleteCatalogItem(id: string): Promise<boolean> {
   const items = getCatalogItems();
   const filtered = items.filter((it) => it.id !== id);
   if (filtered.length === items.length) return false;
   safeSet(STORAGE_KEYS.ITEMS, filtered);
-  deleteCatalogItemFromFirestore(id).catch((err) => {
+  try {
+    await deleteCatalogItemFromFirestore(id);
+    console.log(`Successfully deleted item ${id} from Firestore database.`);
+  } catch (err) {
     console.error('Failed to delete item from Firebase:', err);
-  });
+  }
   return true;
 }
 

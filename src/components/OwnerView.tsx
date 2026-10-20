@@ -35,6 +35,7 @@ import {
   TrendingUp,
   Scale,
   Cloud,
+  RefreshCw,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -85,6 +86,8 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
 
   // Delete confirmation
   const [itemToDelete, setItemToDelete] = useState<CatalogItem | null>(null);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [deleteSuccessNotice, setDeleteSuccessNotice] = useState<string | null>(null);
   const [isClearConfirmModalOpen, setIsClearConfirmModalOpen] = useState(false);
 
   const [dataClearedNotice, setDataClearedNotice] = useState(false);
@@ -150,11 +153,27 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
     setIsItemModalOpen(true);
   };
 
-  const handleDeleteItemConfirm = () => {
+  const handleDeleteItemConfirm = async () => {
     if (itemToDelete) {
-      deleteCatalogItem(itemToDelete.id);
-      setItemToDelete(null);
-      reloadData();
+      const idToDelete = itemToDelete.id;
+      const nameToDelete = itemToDelete.name;
+      setIsDeletingItem(true);
+      try {
+        await deleteCatalogItem(idToDelete);
+        setItemToDelete(null);
+        reloadData();
+        setDeleteSuccessNotice(
+          isTa
+            ? `"${nameToDelete}" உணவு டேட்டாபேஸிலிருந்து வெற்றிகரமாக நீக்கப்பட்டது.`
+            : `"${nameToDelete}" was deleted from the database successfully.`
+        );
+        setTimeout(() => setDeleteSuccessNotice(null), 3500);
+      } catch (err) {
+        console.error('Failed to delete item:', err);
+        reloadData();
+      } finally {
+        setIsDeletingItem(false);
+      }
     }
   };
 
@@ -276,6 +295,14 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
         {/* ================= TAB 1: ITEM & PRICE MANAGEMENT ================= */}
         {activeTab === 'ITEMS' && (
           <div className="space-y-1.5">
+            {/* Delete Success Notice Banner */}
+            {deleteSuccessNotice && (
+              <div className="p-2 rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-black flex items-center gap-1.5 animate-in fade-in shadow-2xs">
+                <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 stroke-[2.5]" />
+                <span>{deleteSuccessNotice}</span>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 bg-white border border-blue-200 p-1.5 rounded-lg shadow-xs">
               <h2 className="text-sm font-black text-slate-900 uppercase">
                 {t.foodItemsAndFixedPrices}
@@ -880,16 +907,30 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
 
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => setItemToDelete(null)}
-                className="flex-1 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase cursor-pointer"
+                disabled={isDeletingItem}
+                className="flex-1 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase cursor-pointer disabled:opacity-50"
               >
                 {t.keepItem}
               </button>
               <button
+                type="button"
                 onClick={handleDeleteItemConfirm}
-                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase shadow-sm cursor-pointer"
+                disabled={isDeletingItem}
+                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase shadow-sm cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50"
               >
-                {t.deleteItem}
+                {isDeletingItem ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{isTa ? 'நீக்குகிறது...' : 'Deleting...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>{t.deleteItem}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

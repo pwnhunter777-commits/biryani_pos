@@ -15,11 +15,12 @@ service cloud.firestore {
     // Catalog items
     match /items/{itemId} {
       allow read: if true;
-      allow write: if isValidId(itemId)
+      allow create, update: if isValidId(itemId)
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.price is number
         && request.resource.data.price >= 0;
+      allow delete: if isValidId(itemId);
     }
 
     // Customer bills

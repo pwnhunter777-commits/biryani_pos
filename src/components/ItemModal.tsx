@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CatalogItem, ItemPricingType } from '../types';
-import { addCatalogItem, updateCatalogItem } from '../db/storage';
+import { addCatalogItem, updateCatalogItem, deleteCatalogItem } from '../db/storage';
 import { translations, Language } from '../utils/translations';
 import { X, Scale, Utensils, Tag, Sparkles } from 'lucide-react';
 
@@ -477,6 +477,19 @@ export const ItemModal: React.FC<ItemModalProps> = ({
 
           {/* Form Actions */}
           <div className="flex gap-2 pt-2 border-t border-slate-200">
+            {editingItem && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await deleteCatalogItem(editingItem.id);
+                  onSave();
+                  onClose();
+                }}
+                className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-black uppercase tracking-wider transition cursor-pointer border border-red-200 shrink-0"
+              >
+                {t.delete}
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
