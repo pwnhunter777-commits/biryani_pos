@@ -48,6 +48,18 @@ import { LanguageToggle } from './LanguageToggle';
 import { AppLogo } from './AppLogo';
 import { PinPad } from './PinPad';
 
+interface PricePromptState {
+  item: CatalogItem;
+  variantKey: string;
+  displayName: string;
+  defaultPrice: number;
+  weightKg: number;
+  variantLabel?: string;
+  cartKey: string;
+  isAlreadyInCart: boolean;
+  currentQty: number;
+}
+
 interface EmployeeViewProps {
   onLogout: () => void;
   employeePin: string;
@@ -97,6 +109,11 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatusMessage, setPrintStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [billSaveError, setBillSaveError] = useState<string | null>(null);
+
+  // Price Prompt Modal State: pops up when food button is clicked to ask for price
+  const [pricePrompt, setPricePrompt] = useState<PricePromptState | null>(null);
+  const [pricePromptValue, setPricePromptValue] = useState<string>('');
+  const [pricePromptQty, setPricePromptQty] = useState<number>(1);
 
   // Quick Edit Price Modal State for Employee
   const [quickEditItem, setQuickEditItem] = useState<{ id: string; name: string; currentPrice: number } | null>(null);
@@ -225,9 +242,130 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
     });
   };
 
-  // Toggle portion logic:
-  // "In the food area in the employee side, for the fixed price food, give in square. If I click it, it must add. If I re-click it, it must remove from the bill. For the plating, keep it the same.
-  // And same for the plating and waiting type food. If I click any gram, it must add. If I re-click it, it must remove from the bill, not add another plate."
+  // Prompt price when food button is clicked:
+  // "if i click this a pop pu must come and ask for the price"
+  const handlePromptItemPrice = (item: CatalogItem, variantKey: string = 'fixed') => {
+    let unitPrice = item.price;
+    let weightKg = item.weightKg || 0.5;
+    let variantLabel = isTa ? 'நிலையான விலை' : 'Fixed';
+    let displayName = item.name;
+
+    if (item.pricingType === 'gram') {
+      if (variantKey === '100g') {
+        unitPrice = item.gramPrices?.p100g ?? item.price;
+        weightKg = 0.1;
+        variantLabel = '100gm';
+        displayName = `${item.name} (100gm)`;
+      } else if (variantKey === '250g') {
+        unitPrice = item.gramPrices?.p250g ?? (item.gramPrices?.p200g ? Math.round(item.gramPrices.p200g * 1.25) : Math.round(item.price * 2.5));
+        weightKg = 0.25;
+        variantLabel = '250gm';
+        displayName = `${item.name} (250gm)`;
+      } else if (variantKey === '200g') {
+        unitPrice = item.gramPrices?.p200g ?? Math.round(item.price * 2);
+        weightKg = 0.2;
+        variantLabel = '200gm';
+        displayName = `${item.name} (200gm)`;
+      } else if (variantKey === '500g') {
+        unitPrice = item.gramPrices?.p500g ?? Math.round(item.price * 5);
+        weightKg = 0.5;
+        variantLabel = '500gm';
+        displayName = `${item.name} (500gm)`;
+      } else if (variantKey === '1kg') {
+        unitPrice = item.gramPrices?.p1kg ?? Math.round(item.price * 10);
+        weightKg = 1.0;
+        variantLabel = '1kg';
+        displayName = `${item.name} (1kg)`;
+      }
+    } else if (item.pricingType === 'plate') {
+      if (variantKey === 'plate1') {
+        unitPrice = item.platePrices?.plate1 ?? item.price;
+        weightKg = 0.5;
+        variantLabel = '1 Plate';
+        displayName = `${item.name} (1 Plate)`;
+      } else if (variantKey === 'plate2') {
+        unitPrice = item.platePrices?.plate2 ?? item.price * 2;
+        weightKg = 1.0;
+        variantLabel = '2 Plate';
+        displayName = `${item.name} (2 Plate)`;
+      } else if (variantKey === 'plate3') {
+        unitPrice = item.platePrices?.plate3 ?? item.price * 3;
+        weightKg = 1.5;
+        variantLabel = '3 Plate';
+        displayName = `${item.name} (3 Plate)`;
+      } else if (variantKey === 'plate4') {
+        unitPrice = item.platePrices?.plate4 ?? item.price * 4;
+        weightKg = 2.0;
+        variantLabel = '4 Plate';
+        displayName = `${item.name} (4 Plate)`;
+      }
+    }
+
+    const cartKey = `${item.id}_${variantKey}`;
+    const altFixedKey = variantKey === 'fixed' ? item.id : null;
+    const existing = cartMap[cartKey] || (altFixedKey ? cartMap[altFixedKey] : undefined);
+    const isAlreadyInCart = !!(existing && existing.quantity > 0);
+
+    const initialPrice = existing ? existing.unitPrice : unitPrice;
+    const initialQty = existing ? existing.quantity : 1;
+
+    setPricePrompt({
+      item,
+      variantKey,
+      displayName,
+      defaultPrice: unitPrice,
+      weightKg,
+      variantLabel,
+      cartKey,
+      isAlreadyInCart,
+      currentQty: initialQty,
+    });
+    setPricePromptValue(initialPrice.toString());
+    setPricePromptQty(initialQty);
+  };
+
+  const handleConfirmPricePrompt = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!pricePrompt) return;
+
+    const priceNum = parseFloat(pricePromptValue);
+    const validPrice = isNaN(priceNum) || priceNum < 0 ? pricePrompt.defaultPrice : priceNum;
+    const validQty = Math.max(1, pricePromptQty);
+
+    setCartMap((prev) => {
+      const next = { ...prev };
+      next[pricePrompt.cartKey] = {
+        cartKey: pricePrompt.cartKey,
+        itemId: pricePrompt.item.id,
+        itemName: pricePrompt.item.name,
+        displayName: pricePrompt.displayName,
+        unitPrice: validPrice,
+        weightKg: pricePrompt.weightKg,
+        quantity: validQty,
+        lineTotal: validQty * validPrice,
+        variantKey: pricePrompt.variantKey,
+        variantLabel: pricePrompt.variantLabel,
+      };
+      return next;
+    });
+
+    setPricePrompt(null);
+  };
+
+  const handleRemoveFromPrompt = () => {
+    if (!pricePrompt) return;
+    setCartMap((prev) => {
+      const next = { ...prev };
+      delete next[pricePrompt.cartKey];
+      if (pricePrompt.variantKey === 'fixed') {
+        delete next[pricePrompt.item.id];
+      }
+      return next;
+    });
+    setPricePrompt(null);
+  };
+
+  // Toggle portion logic fallback:
   const handleTogglePortion = (item: CatalogItem, variantKey: string = 'fixed') => {
     const cartKey = `${item.id}_${variantKey}`;
     const altFixedKey = variantKey === 'fixed' ? item.id : null;
@@ -502,10 +640,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
         <main className="flex-1 max-w-6xl w-full mx-auto p-1.5 sm:p-2 grid grid-cols-1 lg:grid-cols-12 gap-1.5">
           {/* Left Column: Items List (7 cols) - Small Compact Cards with Big Bold Text */}
           <div className="lg:col-span-7 flex flex-col space-y-1.5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-black uppercase tracking-wider text-slate-800">
-                {t.menuItems}
-              </h2>
+            <div className="flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setIsAddItemModalOpen(true)}
@@ -565,7 +700,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                                   <button
                                     key={g.key}
                                     type="button"
-                                    onClick={() => handleTogglePortion(item, g.key)}
+                                    onClick={() => handlePromptItemPrice(item, g.key)}
                                     className={`p-1.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer active:scale-95 ${
                                       isAdded
                                         ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
@@ -623,7 +758,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                                   <button
                                     key={p.key}
                                     type="button"
-                                    onClick={() => handleTogglePortion(item, p.key)}
+                                    onClick={() => handlePromptItemPrice(item, p.key)}
                                     className={`p-1.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer active:scale-95 ${
                                       isAdded
                                         ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
@@ -665,26 +800,13 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                           <button
                             key={item.id}
                             type="button"
-                            onClick={() => handleTogglePortion(item, 'fixed')}
+                            onClick={() => handlePromptItemPrice(item, 'fixed')}
                             className={`aspect-square w-full rounded-xl border-2 p-1.5 flex flex-col justify-between items-center text-center cursor-pointer select-none active:scale-95 transition relative ${
                               isAdded
                                 ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-400'
                                 : 'bg-white border-slate-300 text-slate-900 hover:border-blue-400 hover:bg-blue-50/40 shadow-xs'
                             }`}
                           >
-                            {/* Quick Price Edit Button */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenQuickPriceEdit(item);
-                              }}
-                              className="absolute top-1 left-1 w-5 h-5 rounded-md bg-white/90 hover:bg-white text-slate-600 hover:text-blue-700 flex items-center justify-center border border-slate-300 shadow-2xs z-10 transition cursor-pointer"
-                              title={isTa ? 'விலையை மாற்றுக (Edit Price)' : 'Edit Price'}
-                            >
-                              <Pencil className="w-2.5 h-2.5 stroke-[2.5]" />
-                            </button>
-
                             {/* Selected Indicator Badge in corner */}
                             {isAdded && (
                               <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white text-blue-700 flex items-center justify-center shadow-xs">
@@ -749,32 +871,8 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                       className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-between gap-1.5"
                     >
                       <div className="min-w-0 flex-1 pr-1">
-                        <div className="font-black text-slate-900 text-xs uppercase truncate">
+                        <div className="font-black text-slate-900 text-xs sm:text-sm uppercase truncate">
                           {entry.displayName}
-                        </div>
-                        {/* Editable Price Input directly in cart */}
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="text-xs font-black text-slate-700 font-mono">
-                            {entry.quantity} &times;
-                          </span>
-                          <div className="relative flex items-center bg-white rounded-md border-2 border-blue-300 px-1 py-0.5 focus-within:border-blue-600 shadow-2xs">
-                            <span className="text-[10px] font-black text-slate-500 mr-1 font-mono">
-                              Rs.
-                            </span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={entry.unitPrice}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                handleUpdateCartItemPrice(entry.cartKey, isNaN(val) ? 0 : val);
-                              }}
-                              className="w-14 text-xs font-black text-blue-900 font-mono text-center focus:outline-none"
-                              title={isTa ? 'விலையை மாற்றவும் (Editable Price)' : 'Editable price'}
-                            />
-                            <Pencil className="w-2.5 h-2.5 text-blue-500 ml-0.5 shrink-0 pointer-events-none" />
-                          </div>
                         </div>
                       </div>
 
@@ -963,6 +1061,115 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
             </div>
           )}
         </main>
+      )}
+
+      {/* ================= MODAL: PRICE PROMPT POPUP (When food button is clicked) ================= */}
+      {pricePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
+          <div className="w-full max-w-xs bg-white border-2 border-blue-500 rounded-2xl p-4 text-slate-900 shadow-2xl relative animate-in zoom-in-95">
+            {/* Header: Item Name and Close button */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-3">
+              <h3 className="font-black text-base uppercase text-blue-700 leading-tight truncate pr-2">
+                {pricePrompt.displayName}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPricePrompt(null)}
+                className="text-slate-400 hover:text-slate-800 p-0.5 rounded cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4 stroke-[3]" />
+              </button>
+            </div>
+
+            {/* Price Input Form */}
+            <form onSubmit={handleConfirmPricePrompt} className="space-y-3">
+              <div>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3 font-mono font-black text-slate-400 text-lg">
+                    {isTa ? 'ரூ.' : 'Rs.'}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={pricePromptValue}
+                    onChange={(e) => setPricePromptValue(e.target.value)}
+                    className="w-full pl-12 pr-3 py-2 bg-slate-50 border-2 border-blue-400 focus:border-blue-600 rounded-xl text-2xl font-black text-slate-900 font-mono text-right focus:outline-none focus:bg-white shadow-inner"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* Quantity Stepper */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-xs font-black text-slate-700 uppercase">
+                  {isTa ? 'எண்ணிக்கை' : 'Quantity'}:
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPricePromptQty((q) => Math.max(1, q - 1))}
+                    className="w-7 h-7 rounded-lg bg-white border border-slate-300 text-slate-700 hover:text-red-600 flex items-center justify-center font-black cursor-pointer shadow-2xs"
+                  >
+                    <Minus className="w-3.5 h-3.5 stroke-[3]" />
+                  </button>
+                  <span className="font-mono font-black text-base w-6 text-center text-slate-900">
+                    {pricePromptQty}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPricePromptQty((q) => q + 1)}
+                    className="w-7 h-7 rounded-lg bg-white border border-slate-300 text-slate-700 hover:text-blue-600 flex items-center justify-center font-black cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Line Total preview */}
+              <div className="flex justify-between items-baseline px-1 text-xs font-black">
+                <span className="text-slate-500 uppercase">{isTa ? 'பில் தொகை:' : 'Line Total:'}</span>
+                <span className="text-base font-black text-blue-700 font-mono">
+                  Rs. {((parseFloat(pricePromptValue) || 0) * pricePromptQty).toFixed(0)}
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-1.5 pt-1">
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 cursor-pointer transition"
+                >
+                  <CheckCircle2 className="w-4 h-4 stroke-[3]" />
+                  <span>
+                    {pricePrompt.isAlreadyInCart
+                      ? (isTa ? 'பில்லில் மாற்று' : 'Update in Bill')
+                      : (isTa ? 'பில்லில் சேர்' : 'Add to Bill')}
+                  </span>
+                </button>
+
+                {pricePrompt.isAlreadyInCart && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveFromPrompt}
+                    className="w-full py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-black text-xs uppercase flex items-center justify-center gap-1.5 border border-red-200 cursor-pointer transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>{isTa ? 'பில்லில் இருந்து நீக்கு' : 'Remove from Bill'}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setPricePrompt(null)}
+                  className="w-full py-1 text-slate-500 hover:text-slate-800 text-xs font-black uppercase cursor-pointer"
+                >
+                  {t.cancel}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* ================= MODAL: PRINT / REPRINT DIALOG - Compact ================= */}
