@@ -13,99 +13,112 @@ export const ReceiptView: React.FC<ReceiptViewProps> = ({
   bill,
   settings,
   className = '',
-  lang = 'en',
 }) => {
   const is80mm = settings.paperWidth === '80mm';
-  const isTa = lang === 'ta';
 
   return (
     <div
       id="printable-receipt"
-      className={`bg-white text-black font-mono text-xs p-3 shadow-md border-2 border-slate-300 mx-auto select-text font-black ${
-        is80mm ? 'w-full max-w-[80mm]' : 'w-full max-w-[58mm]'
+      className={`bg-white text-black font-mono px-2.5 py-2 shadow-md border-2 border-slate-400 mx-auto select-text font-black text-xs leading-tight ${
+        is80mm ? 'w-full max-w-[68mm]' : 'w-full max-w-[48mm] sm:max-w-[50mm]'
       } ${className}`}
       style={{
         borderRadius: '4px',
+        fontFamily: "'Courier New', Courier, monospace",
       }}
     >
-      {/* Receipt Header - Bold & Big */}
-      <div className="text-center mb-1.5">
-        {settings.shopName && settings.shopName.trim() !== '' ? (
-          <div className="font-black text-base tracking-wide uppercase mb-0.5">
-            {settings.shopName}
-          </div>
-        ) : (
-          <div className="font-black text-sm uppercase tracking-wide text-black mb-0.5">
-            {isTa ? 'ரசீது / பில்' : 'CASH BILL / INVOICE'}
+      {/* Receipt Header - Compact & Bold */}
+      <div className="text-center mb-1 space-y-0.5">
+        <div className="font-black text-xs sm:text-sm tracking-wide uppercase leading-tight font-mono text-black">
+          {settings.shopName && settings.shopName.trim() !== ''
+            ? settings.shopName.toUpperCase()
+            : 'BIRYANI SHOP'}
+        </div>
+        {settings.tagline && (
+          <div className="text-[9px] font-black text-black leading-tight">
+            {settings.tagline}
           </div>
         )}
-        {settings.tagline && <div className="text-xs font-bold text-slate-700">{settings.tagline}</div>}
-        {settings.address && <div className="text-xs font-bold text-slate-700">{settings.address}</div>}
+        {settings.address && (
+          <div className="text-[9px] font-black text-black leading-tight">
+            {settings.address}
+          </div>
+        )}
         {settings.phone && (
-          <div className="text-xs font-bold text-slate-700">
-            {isTa ? 'தொலைபேசி' : 'TEL'}: {settings.phone}
+          <div className="text-[9px] font-black text-black leading-tight font-mono">
+            TEL: {settings.phone}
           </div>
         )}
       </div>
 
       <div className="border-t-2 border-dashed border-black my-1" />
 
-      {/* Bill Meta */}
-      <div className="text-xs font-black leading-tight space-y-0.5">
-        <div className="flex justify-between">
-          <span className="font-black">{isTa ? 'பில்' : 'BILL'}: {bill.billNumber}</span>
-          <span>{isTa ? 'தேதி' : 'DATE'}: {bill.dateString}</span>
+      {/* Bill Meta - Bold */}
+      <div className="text-[10px] font-black leading-tight space-y-0.5 font-mono text-black">
+        <div className="flex justify-between items-center">
+          <span className="font-black">BILL: #{bill.billNumber}</span>
+          <span className="font-black">{bill.dateString}</span>
         </div>
-        <div className="flex justify-between text-slate-700">
-          <span>{isTa ? 'நேரம்' : 'TIME'}: {bill.timeString}</span>
-          <span>{isTa ? 'எண்ணிக்கை' : 'ITEMS'}: {bill.totalQuantity}</span>
+        <div className="flex justify-between items-center text-black">
+          <span className="font-black">TIME: {bill.timeString}</span>
+          <span className="font-black">{bill.totalQuantity} ITEMS</span>
         </div>
       </div>
 
       <div className="border-t-2 border-dashed border-black my-1" />
 
-      {/* Item Table Header */}
-      <div className="flex justify-between font-black text-xs uppercase pb-1 border-b-2 border-black">
-        <span className="w-1/2 text-left">{isTa ? 'உணவு' : 'ITEM'}</span>
-        <span className="w-1/6 text-center">{isTa ? 'எண்' : 'QTY'}</span>
-        <span className="w-1/6 text-right">{isTa ? 'விலை' : 'PRICE'}</span>
-        <span className="w-1/6 text-right">{isTa ? 'தொகை' : 'TOTAL'}</span>
-      </div>
-
-      {/* Item Rows - Big & Bold */}
-      <div className="space-y-1 my-1">
+      {/* Items List - Compact & Bold */}
+      <div className="space-y-1 my-1 font-mono">
         {bill.items.map((item, idx) => (
-          <div key={idx} className="flex justify-between items-start text-xs font-black leading-tight">
-            <span className="w-1/2 text-left uppercase truncate pr-1" title={item.name}>
-              {item.name}
-            </span>
-            <span className="w-1/6 text-center">{item.quantity}</span>
-            <span className="w-1/6 text-right">{item.unitPrice.toFixed(0)}</span>
-            <span className="w-1/6 text-right font-black">{item.lineTotal.toFixed(0)}</span>
+          <div key={idx} className="flex flex-col text-[11px] leading-tight text-black">
+            <div className="flex justify-between items-baseline gap-1">
+              <span className="font-black uppercase break-words flex-1 text-black">
+                {item.name}
+              </span>
+              <span className="font-black text-xs shrink-0 text-black">
+                Rs. {item.lineTotal.toFixed(0)}
+              </span>
+            </div>
+            {item.quantity > 1 || item.lineTotal !== item.unitPrice ? (
+              <div className="text-[9px] font-black text-black pl-1">
+                {item.quantity} x Rs. {item.unitPrice.toFixed(0)}
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
 
       <div className="border-t-2 border-dashed border-black my-1" />
 
-      {/* Total Section - Very Big & Bold */}
-      <div className="flex justify-between items-center text-sm font-black py-1">
-        <span>{isTa ? 'மொத்தம்' : 'TOTAL'}:</span>
-        <span className="text-lg font-black">
-          {isTa ? 'ரூ.' : 'Rs.'} {bill.totalAmount.toFixed(0)}
+      {/* Total Section - Bold */}
+      <div className="flex justify-between items-baseline py-0.5 font-mono text-black">
+        <span className="text-xs font-black uppercase tracking-wide text-black">
+          TOTAL AMOUNT:
+        </span>
+        <span className="text-base sm:text-lg font-black text-black">
+          Rs. {bill.totalAmount.toFixed(0)}
         </span>
       </div>
 
-      {bill.printCount > 0 && (
-        <>
-          <div className="border-t-2 border-dashed border-black my-1" />
-          <div className="text-center text-xs font-black text-slate-800 mt-1 space-y-0.5">
-            <div className="text-[10px] text-slate-500">
-              {isTa ? 'பிரிண்ட்' : 'PRINT'} #{bill.printCount}
-            </div>
+      <div className="border-t-2 border-dashed border-black my-1" />
+
+      {/* Footer Notes - Bold */}
+      <div className="text-center text-[9px] font-black mt-1 space-y-0.5 font-mono text-black">
+        {settings.footerNote ? (
+          <div className="font-black text-black leading-tight">
+            {settings.footerNote}
           </div>
-        </>
-      )}
+        ) : (
+          <div className="font-black text-black leading-tight">
+            Thank you! Visit again!
+          </div>
+        )}
+        {bill.printCount > 0 && (
+          <div className="text-[8px] font-black text-black mt-0.5">
+            PRINT #{bill.printCount}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

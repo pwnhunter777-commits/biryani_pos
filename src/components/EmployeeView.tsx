@@ -173,10 +173,10 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
           displayName = `${item.name} (1kg)`;
         }
       } else if (item.pricingType === 'plate') {
-        const pLabel1 = isTa ? '1 தட்டு' : '1 Plate';
-        const pLabel2 = isTa ? '2 தட்டு' : '2 Plate';
-        const pLabel3 = isTa ? '3 தட்டு' : '3 Plate';
-        const pLabel4 = isTa ? '4 தட்டு' : '4 Plate';
+        const pLabel1 = '1 Plate';
+        const pLabel2 = '2 Plate';
+        const pLabel3 = '3 Plate';
+        const pLabel4 = '4 Plate';
 
         if (variantKey === 'plate1') {
           unitPrice = item.platePrices?.plate1 ?? item.price;
@@ -373,9 +373,6 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                   ? settings.shopName
                   : t.appName}
               </h1>
-              <span className="text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-300 px-1.5 py-0.2 rounded uppercase">
-                {t.cashier}
-              </span>
             </div>
           </div>
 
@@ -384,16 +381,6 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
             {onLanguageChange && (
               <LanguageToggle currentLang={lang} onLanguageChange={onLanguageChange} />
             )}
-
-            {/* Share to Owner Button */}
-            <button
-              onClick={() => setIsShareModalOpen(true)}
-              className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black flex items-center gap-1 transition cursor-pointer uppercase shadow-2xs"
-              title={t.shareToOwner}
-            >
-              <Share2 className="w-3.5 h-3.5 text-emerald-700 stroke-[2.5]" />
-              <span className="hidden sm:inline">{t.shareToOwner}</span>
-            </button>
 
             {/* Bluetooth connection button */}
             <button
@@ -434,39 +421,25 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
           {/* Page 1 Button */}
           <button
             onClick={() => setCurrentPage('BILLING')}
-            className={`flex-1 sm:flex-none px-3 py-1 rounded-md text-xs font-black uppercase flex items-center justify-center gap-1.5 transition cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3.5 py-1 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer ${
               currentPage === 'BILLING'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
             }`}
           >
-            <ShoppingBag className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>{t.page1Billing}</span>
-            {selectedCartItems.length > 0 && (
-              <span className="bg-white text-blue-700 text-[10px] font-black px-1.5 py-0.2 rounded ml-1 shadow-xs">
-                {totalBillItemsCount}
-              </span>
-            )}
           </button>
 
           {/* Page 2 Button */}
           <button
             onClick={() => setCurrentPage('HISTORY')}
-            className={`flex-1 sm:flex-none px-3 py-1 rounded-md text-xs font-black uppercase flex items-center justify-center gap-1.5 transition cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3.5 py-1 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer ${
               currentPage === 'HISTORY'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
             }`}
           >
-            <Receipt className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>{t.page2History}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded font-black ml-1 ${
-                currentPage === 'HISTORY' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-700'
-              }`}
-            >
-              {savedBills.length}
-            </span>
           </button>
         </div>
       </nav>
@@ -525,13 +498,13 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                         return (
                           <div
                             key={item.id}
-                            className="p-2 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between select-none"
+                            className="p-1.5 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between select-none"
                           >
-                            <h4 className="font-black text-slate-900 text-sm uppercase leading-tight mb-1.5 truncate">
+                            <h4 className="font-black text-slate-900 text-sm sm:text-base uppercase leading-tight mb-1 truncate">
                               {item.name}
                             </h4>
 
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <div className="grid grid-cols-2 gap-1">
                               {portions.map((g) => {
                                 const cartKey = `${item.id}_${g.key}`;
                                 const isAdded = (cartMap[cartKey]?.quantity || 0) > 0;
@@ -547,10 +520,10 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                                     }`}
                                   >
                                     <div className="min-w-0">
-                                      <div className={`font-black text-xs leading-none ${isAdded ? 'text-white' : 'text-emerald-900'}`}>
+                                      <div className={`font-black text-xs sm:text-sm leading-none ${isAdded ? 'text-white' : 'text-emerald-900'}`}>
                                         {g.label}
                                       </div>
-                                      <div className={`text-[11px] font-mono font-black mt-0.5 ${isAdded ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                                      <div className={`text-xs sm:text-sm font-mono font-black mt-0.5 ${isAdded ? 'text-emerald-100' : 'text-emerald-700'}`}>
                                         {isTa ? 'ரூ.' : 'Rs.'} {g.price}
                                       </div>
                                     </div>
@@ -583,13 +556,13 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                         return (
                           <div
                             key={item.id}
-                            className="p-2 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between select-none"
+                            className="p-1.5 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between select-none"
                           >
-                            <h4 className="font-black text-slate-900 text-sm uppercase leading-tight mb-1.5 truncate">
+                            <h4 className="font-black text-slate-900 text-sm sm:text-base uppercase leading-tight mb-1 truncate">
                               {item.name}
                             </h4>
 
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <div className="grid grid-cols-2 gap-1">
                               {plates.map((p) => {
                                 const cartKey = `${item.id}_${p.key}`;
                                 const isAdded = (cartMap[cartKey]?.quantity || 0) > 0;
@@ -605,10 +578,10 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                                     }`}
                                   >
                                     <div className="min-w-0">
-                                      <div className={`font-black text-xs leading-none ${isAdded ? 'text-white' : 'text-indigo-900'}`}>
+                                      <div className={`font-black text-xs sm:text-sm leading-none ${isAdded ? 'text-white' : 'text-indigo-900'}`}>
                                         {p.label}
                                       </div>
-                                      <div className={`text-[11px] font-mono font-black mt-0.5 ${isAdded ? 'text-indigo-100' : 'text-indigo-700'}`}>
+                                      <div className={`text-xs sm:text-sm font-mono font-black mt-0.5 ${isAdded ? 'text-indigo-100' : 'text-indigo-700'}`}>
                                         {isTa ? 'ரூ.' : 'Rs.'} {p.price}
                                       </div>
                                     </div>
@@ -625,9 +598,9 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                   </div>
                 )}
 
-                {/* 3. Fixed Price Foods - Square Tiles */}
+                {/* 3. Fixed Price Foods - Square Tiles (A bit smaller with bold & big text) */}
                 {items.some((i) => i.pricingType === 'fixed' || !i.pricingType) && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5">
                     {items
                       .filter((i) => i.pricingType === 'fixed' || !i.pricingType)
                       .map((item) => {
@@ -640,28 +613,29 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                             key={item.id}
                             type="button"
                             onClick={() => handleTogglePortion(item, 'fixed')}
-                            className={`aspect-square w-full rounded-xl border-2 p-2 flex flex-col justify-between items-center text-center cursor-pointer select-none active:scale-95 transition ${
+                            className={`aspect-square w-full rounded-xl border-2 p-1.5 flex flex-col justify-between items-center text-center cursor-pointer select-none active:scale-95 transition relative ${
                               isAdded
                                 ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-400'
                                 : 'bg-white border-slate-300 text-slate-900 hover:border-blue-400 hover:bg-blue-50/40 shadow-xs'
                             }`}
                           >
-                            <div className="w-full flex justify-end">
-                              {isAdded ? (
-                                <span className="w-4 h-4 rounded-full bg-white text-blue-700 flex items-center justify-center text-[10px] font-black shadow-2xs">
-                                  <Check className="w-3 h-3 stroke-[3.5]" />
-                                </span>
-                              ) : (
-                                <span className="w-4 h-4" />
-                              )}
+                            {/* Selected Indicator Badge in corner */}
+                            {isAdded && (
+                              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white text-blue-700 flex items-center justify-center shadow-xs">
+                                <Check className="w-3 h-3 stroke-[3.5]" />
+                              </span>
+                            )}
+
+                            {/* Big Bold Item Name */}
+                            <div className="my-auto px-0.5 w-full flex items-center justify-center">
+                              <h4 className="font-black text-sm sm:text-base uppercase leading-tight line-clamp-2">
+                                {item.name}
+                              </h4>
                             </div>
 
-                            <h4 className="font-black text-xs sm:text-sm uppercase leading-snug px-1 line-clamp-2">
-                              {item.name}
-                            </h4>
-
+                            {/* Big Bold Price */}
                             <div
-                              className={`font-mono font-black text-sm sm:text-base ${
+                              className={`font-mono font-black text-sm sm:text-base leading-none tracking-tight pb-0.5 ${
                                 isAdded ? 'text-amber-200' : 'text-blue-700'
                               }`}
                             >
@@ -699,9 +673,8 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
               <div className="flex-1 min-h-[120px] max-h-[220px] overflow-y-auto space-y-1.5 pr-1">
                 {selectedCartItems.length === 0 ? (
                   <div className="h-full py-6 flex flex-col items-center justify-center text-center text-slate-400">
-                    <Receipt className="w-6 h-6 stroke-[1.5] text-slate-300 mb-1" />
-                    <span className="text-xs font-bold">{t.noItemsAdded}</span>
-                    <span className="text-[11px] font-bold text-slate-400">{t.tapPlusToStart}</span>
+                    <Receipt className="w-6 h-6 stroke-[2] text-slate-400 mb-1" />
+                    <span className="text-xs font-black text-slate-600 uppercase">{t.noItemsAdded}</span>
                   </div>
                 ) : (
                   selectedCartItems.map((entry) => (
@@ -713,8 +686,8 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                         <div className="font-black text-slate-900 text-xs uppercase truncate">
                           {entry.displayName}
                         </div>
-                        <div className="text-[11px] font-bold text-slate-600 mt-0.5">
-                          {entry.quantity} &times; {isTa ? 'ரூ.' : 'Rs.'} {entry.unitPrice.toFixed(0)}
+                        <div className="text-[11px] font-black text-slate-700 mt-0.5">
+                          {entry.quantity} &times; Rs. {entry.unitPrice.toFixed(0)}
                         </div>
                       </div>
 
@@ -744,7 +717,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                         </div>
 
                         <div className="font-black text-blue-700 text-sm font-mono min-w-[50px] text-right">
-                          {isTa ? 'ரூ.' : 'Rs.'} {entry.lineTotal.toFixed(0)}
+                          Rs. {entry.lineTotal.toFixed(0)}
                         </div>
 
                         <button
@@ -771,7 +744,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                 <div className="flex justify-between items-baseline pt-1 border-t border-dashed border-slate-300">
                   <span className="text-sm font-black text-slate-800 uppercase">{t.billTotal}</span>
                   <span className="text-2xl font-black text-blue-700 tracking-tight">
-                    {isTa ? 'ரூ.' : 'Rs.'} {totalBillAmount.toFixed(0)}
+                    Rs. {totalBillAmount.toFixed(0)}
                   </span>
                 </div>
               </div>
@@ -789,20 +762,10 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                 type="button"
                 onClick={handleConfirmAndSaveBill}
                 disabled={selectedCartItems.length === 0}
-                className="w-full mt-2 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-sm uppercase shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full mt-2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <CheckCircle2 className="w-4 h-4 stroke-[3]" />
-                {t.confirmAndSaveBill}
-              </button>
-
-              {/* Quick Share to Owner */}
-              <button
-                type="button"
-                onClick={() => setIsShareModalOpen(true)}
-                className="w-full mt-1.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-black text-xs uppercase flex items-center justify-center gap-1.5 cursor-pointer transition"
-              >
-                <Share2 className="w-3.5 h-3.5 text-emerald-700" />
-                <span>{t.shareToOwner}</span>
+                <CheckCircle2 className="w-5 h-5 stroke-[3]" />
+                <span>{t.confirmAndSaveBill}</span>
               </button>
             </div>
           </div>
@@ -812,31 +775,12 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
       {/* ================= PAGE 2: BILL HISTORY ================= */}
       {currentPage === 'HISTORY' && (
         <main className="flex-1 max-w-6xl w-full mx-auto p-2 sm:p-2.5 space-y-1.5">
-          {/* Employee Phone Storage Policy Banner & Share Button */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 shadow-2xs">
-            <div className="flex items-center gap-1.5 text-blue-900 text-xs font-bold">
-              <Smartphone className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>{t.savedOnPhoneNotice} ({displayedHistoryBills.length} {t.billsDate})</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsShareModalOpen(true)}
-              className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer uppercase shrink-0"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>{t.shareToOwner}</span>
-            </button>
-          </div>
-
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 bg-white border border-blue-200 p-2 rounded-lg shadow-xs">
             <div>
               <h2 className="text-sm font-black uppercase text-slate-900 flex items-center gap-1.5">
                 <Receipt className="w-4 h-4 text-blue-600 stroke-[2.5]" />
                 {t.billHistoryAndReprint}
               </h2>
-              <p className="text-[11px] font-bold text-slate-500">
-                {t.searchBillsSub}
-              </p>
             </div>
 
             {/* Bill Number Search */}
@@ -937,12 +881,12 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
       {/* ================= MODAL: PRINT / REPRINT DIALOG - Compact ================= */}
       {isPrintDialogOpen && confirmedBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
-          <div className="w-full max-w-sm bg-white border-2 border-blue-200 rounded-2xl p-3.5 text-slate-900 shadow-xl relative flex flex-col max-h-[92vh] overflow-hidden">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+          <div className="w-full max-w-xs sm:max-w-[300px] bg-white border-2 border-blue-200 rounded-2xl p-3 text-slate-900 shadow-xl relative flex flex-col max-h-[92vh] overflow-hidden">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 stroke-[3]" />
                 <div>
-                  <h3 className="font-black text-base text-slate-900 uppercase">{t.billSaved}</h3>
+                  <h3 className="font-black text-sm uppercase text-slate-900">{t.billSaved}</h3>
                   <p className="text-xs font-black text-blue-700">
                     {confirmedBill.billNumber} &bull; {isTa ? 'ரூ.' : 'Rs.'} {confirmedBill.totalAmount.toFixed(0)}
                   </p>
@@ -970,7 +914,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
             )}
 
             {/* Receipt Preview */}
-            <div className="flex-1 overflow-y-auto py-2">
+            <div className="flex-1 overflow-y-auto py-1.5">
               <ReceiptView bill={confirmedBill} settings={settings} lang={lang} />
             </div>
 
@@ -1002,10 +946,10 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
       {/* ================= MODAL: HISTORY DETAILS VIEWER - Compact ================= */}
       {selectedHistoryBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
-          <div className="w-full max-w-sm bg-white border-2 border-blue-200 rounded-2xl p-3.5 text-slate-900 shadow-xl relative flex flex-col max-h-[92vh] overflow-hidden">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+          <div className="w-full max-w-xs sm:max-w-[300px] bg-white border-2 border-blue-200 rounded-2xl p-3 text-slate-900 shadow-xl relative flex flex-col max-h-[92vh] overflow-hidden">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
               <div>
-                <h3 className="font-black text-base text-slate-900 uppercase">{t.billSnapshot}</h3>
+                <h3 className="font-black text-sm uppercase text-slate-900">{t.billSnapshot}</h3>
                 <p className="text-xs font-black text-blue-700">
                   {selectedHistoryBill.billNumber} &bull; {selectedHistoryBill.dateString} {selectedHistoryBill.timeString}
                 </p>

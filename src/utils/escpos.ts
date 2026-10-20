@@ -80,37 +80,18 @@ export function generateEscPosReceipt(bill: Bill, settings: ShopSettings): Uint8
   addLine(padColumns(`Bill No: ${bill.billNumber}`, `Date: ${bill.dateString}`, lineWidth));
   addLine(padColumns(`Time: ${bill.timeString}`, `Type: Dine/Take`, lineWidth));
 
-  addLine(makeDivider('-'));
-
-  // Items table
-  setBold(true);
-  if (is80mm) {
-    // 48 columns layout: ITEM (20) | QTY (6) | PRICE (10) | TOTAL (12)
-    const h = 'ITEM'.padEnd(20) + 'QTY'.padStart(6) + 'PRICE'.padStart(10) + 'TOTAL'.padStart(12);
-    addLine(h);
-  } else {
-    // 32 columns layout: ITEM (14) | QTY (4) | RATE (6) | TOTAL (8)
-    const h = 'ITEM'.padEnd(14) + 'QTY'.padStart(4) + 'RATE'.padStart(6) + 'AMT'.padStart(8);
-    addLine(h);
-  }
-  setBold(false);
-  addLine(makeDivider('-'));
-
   // Item rows
   for (const item of bill.items) {
-    const name = item.name.length > (is80mm ? 19 : 13)
-      ? item.name.substring(0, is80mm ? 19 : 13)
-      : item.name;
-    const qtyStr = item.quantity.toString();
-    const rateStr = item.unitPrice.toFixed(0);
-    const lineTotalStr = item.lineTotal.toFixed(0);
-
-    if (is80mm) {
-      const line = name.padEnd(20) + qtyStr.padStart(6) + rateStr.padStart(10) + lineTotalStr.padStart(12);
-      addLine(line);
+    setBold(true);
+    addLine(item.name.toUpperCase());
+    setBold(false);
+    if (item.quantity > 1 || item.lineTotal !== item.unitPrice) {
+      const qtyPart = `  ${item.quantity} x ${item.unitPrice.toFixed(0)}`;
+      const amtPart = `Rs. ${item.lineTotal.toFixed(0)}`;
+      addLine(padColumns(qtyPart, amtPart, lineWidth));
     } else {
-      const line = name.padEnd(14) + qtyStr.padStart(4) + rateStr.padStart(6) + lineTotalStr.padStart(8);
-      addLine(line);
+      const amtPart = `Rs. ${item.lineTotal.toFixed(0)}`;
+      addLine(padColumns('  1 portion', amtPart, lineWidth));
     }
   }
 

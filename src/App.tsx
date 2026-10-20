@@ -41,6 +41,15 @@ export default function App() {
   };
 
   useEffect(() => {
+    document.documentElement.lang = lang;
+    if (lang === 'ta') {
+      document.body.classList.add('lang-ta');
+    } else {
+      document.body.classList.remove('lang-ta');
+    }
+  }, [lang]);
+
+  useEffect(() => {
     checkAndPerformThreeDayReset();
     const unsub = subscribeToStore(() => {
       setSettings(getShopSettings());
@@ -71,35 +80,39 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start antialiased selection:bg-blue-600 selection:text-white font-bold">
+    <div
+      className={`min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start antialiased selection:bg-blue-600 selection:text-white font-bold ${
+        lang === 'ta' ? 'lang-ta' : ''
+      }`}
+    >
       {/* Main Container */}
       <div className="w-full max-w-full flex-1 flex flex-col">
         {/* ================= SCREEN 1: OPENING SCREEN ================= */}
         {screen === 'OPENING_SCREEN' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-4 text-center bg-gradient-to-b from-blue-50/80 via-white to-slate-50 relative">
+          <div className="flex-1 flex flex-col items-center justify-center p-3 text-center bg-gradient-to-b from-blue-50/80 via-white to-slate-50 relative">
             {/* Top Language Toggle */}
-            <div className="absolute top-4 right-4">
+            <div className="absolute top-3 right-3">
               <LanguageToggle currentLang={lang} onLanguageChange={handleLanguageChange} />
             </div>
 
             {/* App Logo */}
-            <div className="mb-2.5">
+            <div className="mb-2">
               <AppLogo size="lg" />
             </div>
 
-            {/* Main Title */}
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight mb-4">
+            {/* Main Title - Bold and Big */}
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight mb-3">
               {settings.shopName && settings.shopName.trim() !== ''
                 ? settings.shopName
                 : t.appName}
             </h1>
 
-            {/* Clean, Compact, Bold Buttons */}
+            {/* Clean, Compact, Bold Big Buttons */}
             <div className="w-full max-w-xs space-y-2">
               <button
                 type="button"
                 onClick={() => setScreen('OWNER_LOGIN')}
-                className="w-full py-2.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-sm sm:text-base uppercase tracking-wider shadow-md shadow-blue-500/20 transition cursor-pointer text-center flex items-center justify-center"
+                className="w-full py-2.5 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wide shadow-md shadow-blue-500/20 transition cursor-pointer text-center flex items-center justify-center"
               >
                 <span>{t.ownerLogin}</span>
               </button>
@@ -107,7 +120,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setScreen('EMPLOYEE_LOGIN')}
-                className="w-full py-2.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-sm sm:text-base uppercase tracking-wider shadow-md shadow-blue-500/20 transition cursor-pointer text-center flex items-center justify-center"
+                className="w-full py-2.5 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase tracking-wide shadow-md shadow-blue-500/20 transition cursor-pointer text-center flex items-center justify-center"
               >
                 <span>{t.employeeLogin}</span>
               </button>

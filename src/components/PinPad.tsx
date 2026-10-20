@@ -66,16 +66,16 @@ export const PinPad: React.FC<PinPadProps> = ({
   };
 
   return (
-    <div className="w-full max-w-xs mx-auto p-3.5 bg-white border-2 border-blue-200 rounded-xl shadow-lg flex flex-col items-center">
+    <div className="w-full max-w-[280px] mx-auto p-3 bg-white border-2 border-blue-200 rounded-xl shadow-lg flex flex-col items-center select-none">
       <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center mb-1.5 shadow-xs">
         <Lock className="w-4 h-4 stroke-[2.5]" />
       </div>
 
-      <h2 className="text-lg font-black text-slate-900 tracking-tight text-center">{title}</h2>
-      {subtitle && <p className="text-[11px] font-bold text-slate-500 mt-0.5 text-center">{subtitle}</p>}
+      <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight text-center leading-tight">{title}</h2>
+      {subtitle && <p className="text-xs font-black text-slate-500 mt-0.5 text-center">{subtitle}</p>}
 
       {/* Pin dots */}
-      <div className="flex gap-2.5 my-2.5">
+      <div className="flex gap-2.5 my-2">
         {Array.from({ length: maxDigits }).map((_, i) => (
           <div
             key={i}
@@ -89,19 +89,19 @@ export const PinPad: React.FC<PinPadProps> = ({
       </div>
 
       {error && (
-        <div className="text-red-700 text-xs font-black mb-1.5 text-center bg-red-100 border border-red-300 px-2 py-0.5 rounded-md animate-shake">
+        <div className="text-red-700 text-xs sm:text-sm font-black mb-1.5 text-center bg-red-100 border border-red-300 px-2 py-0.5 rounded-md animate-shake">
           {error}
         </div>
       )}
 
-      {/* Keypad Grid - Compact Small Buttons with Big Bold Text */}
+      {/* Keypad Grid - Small Compact Buttons with Big Bold Text */}
       <div className="grid grid-cols-3 gap-1.5 w-full">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
           <button
             key={digit}
             type="button"
             onClick={() => handleDigit(digit)}
-            className="h-11 rounded-lg bg-slate-50 hover:bg-blue-50 active:bg-blue-100 text-slate-900 hover:text-blue-700 font-black text-xl border-2 border-slate-200 active:border-blue-500 transition-all flex items-center justify-center select-none shadow-xs cursor-pointer"
+            className="h-10 rounded-lg bg-slate-50 hover:bg-blue-50 active:bg-blue-100 text-slate-900 hover:text-blue-700 font-black text-2xl border-2 border-slate-200 active:border-blue-500 transition-all flex items-center justify-center select-none shadow-xs cursor-pointer"
           >
             {digit}
           </button>
@@ -110,7 +110,7 @@ export const PinPad: React.FC<PinPadProps> = ({
         <button
           type="button"
           onClick={handleClear}
-          className="h-11 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs border-2 border-slate-200 transition-all flex items-center justify-center select-none cursor-pointer uppercase"
+          className="h-10 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs sm:text-sm border-2 border-slate-200 transition-all flex items-center justify-center select-none cursor-pointer uppercase"
         >
           {t.clear}
         </button>
@@ -118,7 +118,7 @@ export const PinPad: React.FC<PinPadProps> = ({
         <button
           type="button"
           onClick={() => handleDigit('0')}
-          className="h-11 rounded-lg bg-slate-50 hover:bg-blue-50 active:bg-blue-100 text-slate-900 hover:text-blue-700 font-black text-xl border-2 border-slate-200 active:border-blue-500 transition-all flex items-center justify-center select-none shadow-xs cursor-pointer"
+          className="h-10 rounded-lg bg-slate-50 hover:bg-blue-50 active:bg-blue-100 text-slate-900 hover:text-blue-700 font-black text-2xl border-2 border-slate-200 active:border-blue-500 transition-all flex items-center justify-center select-none shadow-xs cursor-pointer"
         >
           0
         </button>
@@ -126,7 +126,7 @@ export const PinPad: React.FC<PinPadProps> = ({
         <button
           type="button"
           onClick={handleDelete}
-          className="h-11 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border-2 border-slate-200 transition-all flex items-center justify-center select-none cursor-pointer"
+          className="h-10 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border-2 border-slate-200 transition-all flex items-center justify-center select-none cursor-pointer"
           aria-label="Delete"
         >
           <Delete className="w-4 h-4 stroke-[2.5]" />
@@ -137,7 +137,7 @@ export const PinPad: React.FC<PinPadProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="mt-3 text-sm font-black text-slate-600 hover:text-blue-700 transition-colors cursor-pointer uppercase"
+          className="mt-2.5 text-sm font-black text-slate-600 hover:text-blue-700 transition-colors cursor-pointer uppercase"
         >
           {t.cancel}
         </button>
