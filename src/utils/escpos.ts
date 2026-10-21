@@ -85,7 +85,11 @@ export function generateEscPosReceipt(bill: Bill, settings: ShopSettings): Uint8
     setBold(true);
     addLine(item.name.toUpperCase());
     setBold(false);
-    if (item.quantity > 1 || item.lineTotal !== item.unitPrice) {
+    if (item.weightKg) {
+      const qtyPart = `  ${item.weightKg} KG x ${item.unitPrice.toFixed(0)}`;
+      const amtPart = `Rs. ${item.lineTotal.toFixed(0)}`;
+      addLine(padColumns(qtyPart, amtPart, lineWidth));
+    } else if (item.quantity > 1 || item.lineTotal !== item.unitPrice) {
       const qtyPart = `  ${item.quantity} x ${item.unitPrice.toFixed(0)}`;
       const amtPart = `Rs. ${item.lineTotal.toFixed(0)}`;
       addLine(padColumns(qtyPart, amtPart, lineWidth));

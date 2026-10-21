@@ -45,7 +45,12 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null,
+  shouldThrow = true
+) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -64,7 +69,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path,
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  if (shouldThrow) {
+    throw new Error(JSON.stringify(errInfo));
+  }
 }
 
 // Test connection on boot as mandated
@@ -101,6 +108,17 @@ export async function deleteCatalogItemFromFirestore(id: string): Promise<void> 
   const path = `items/${id}`;
   try {
     await deleteDoc(doc(db, 'items', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function clearAllCatalogItemsFromFirestore(): Promise<void> {
+  const path = 'items';
+  try {
+    const snapshot = await getDocs(collection(db, path));
+    const batchDeletes = snapshot.docs.map((docSnap) => deleteDoc(doc(db, path, docSnap.id)));
+    await Promise.allSettled(batchDeletes);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
@@ -157,7 +175,7 @@ export function subscribeToFirestoreItems(
     },
     (error) => {
       onError?.(error);
-      handleFirestoreError(error, OperationType.GET, path);
+      handleFirestoreError(error, OperationType.GET, path, false);
     }
   );
 }
@@ -178,7 +196,7 @@ export function subscribeToFirestoreBills(
     },
     (error) => {
       onError?.(error);
-      handleFirestoreError(error, OperationType.GET, path);
+      handleFirestoreError(error, OperationType.GET, path, false);
     }
   );
 }
@@ -199,7 +217,7 @@ export function subscribeToFirestoreSettings(
     },
     (error) => {
       onError?.(error);
-      handleFirestoreError(error, OperationType.GET, path);
+      handleFirestoreError(error, OperationType.GET, path, false);
     }
   );
 }
@@ -220,7 +238,7 @@ export function subscribeToFirestoreDailyReports(
     },
     (error) => {
       onError?.(error);
-      handleFirestoreError(error, OperationType.GET, path);
+      handleFirestoreError(error, OperationType.GET, path, false);
     }
   );
 }

@@ -4,6 +4,8 @@ import {
   addCatalogItem,
   updateCatalogItem,
   deleteCatalogItem,
+  clearAllCatalogItems,
+  resetToDefaultChickenItems,
   getTodayDateString,
   getSalesSummaryForDate,
   getItemSalesReportForDate,
@@ -89,6 +91,7 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
   const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [deleteSuccessNotice, setDeleteSuccessNotice] = useState<string | null>(null);
   const [isClearConfirmModalOpen, setIsClearConfirmModalOpen] = useState(false);
+  const [isClearAllItemsModalOpen, setIsClearAllItemsModalOpen] = useState(false);
 
   const [dataClearedNotice, setDataClearedNotice] = useState(false);
 
@@ -175,6 +178,29 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
         setIsDeletingItem(false);
       }
     }
+  };
+
+  const handleClearAllItemsConfirm = () => {
+    clearAllCatalogItems();
+    setIsClearAllItemsModalOpen(false);
+    reloadData();
+    setDeleteSuccessNotice(
+      isTa
+        ? 'டேட்டாபேஸிலிருந்து அனைத்து உணவுப் பொருட்களும் வெற்றிகரமாக நீக்கப்பட்டன.'
+        : 'All items have been cleared from the database successfully.'
+    );
+    setTimeout(() => setDeleteSuccessNotice(null), 3500);
+  };
+
+  const handleResetChickenCuts = () => {
+    resetToDefaultChickenItems();
+    reloadData();
+    setDeleteSuccessNotice(
+      isTa
+        ? 'தரநிலை கோழி பட்டியல் மீட்டமைக்கப்பட்டது.'
+        : 'Standard chicken cuts restored successfully.'
+    );
+    setTimeout(() => setDeleteSuccessNotice(null), 3500);
   };
 
   // Calculations for Reports
@@ -303,31 +329,63 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 bg-white border border-blue-200 p-1.5 rounded-lg shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 bg-white border border-blue-200 p-2 rounded-xl shadow-xs">
               <h2 className="text-sm font-black text-slate-900 uppercase">
                 {t.foodItemsAndFixedPrices}
               </h2>
-              <button
-                onClick={handleOpenAddModal}
-                className="px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition shrink-0 uppercase"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>{t.addItem}</span>
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsClearAllItemsModalOpen(true)}
+                  title={isTa ? 'டேட்டாபேஸிலிருந்து அனைத்து பொருட்களையும் நீக்கு' : 'Clear all items from database'}
+                  className="px-2.5 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-black text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition uppercase"
+                >
+                  <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>{isTa ? 'அனைத்தும் நீக்கு' : 'Clear Database'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetChickenCuts}
+                  title={isTa ? 'தரநிலை கோழி பட்டியல்' : 'Restore Standard Cuts'}
+                  className="px-2.5 py-1 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 font-black text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition uppercase"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>{isTa ? 'கோழி பட்டியல்' : 'Standard Cuts'}</span>
+                </button>
+                <button
+                  onClick={handleOpenAddModal}
+                  className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition uppercase"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>{t.addItem}</span>
+                </button>
+              </div>
             </div>
 
             {/* Items List - Compact Small Divs */}
             {items.length === 0 ? (
-              <div className="bg-white border-2 border-dashed border-slate-300 rounded-lg p-3 text-center flex flex-col items-center">
-                <UtensilsCrossed className="w-6 h-6 text-blue-600 stroke-[2] mb-1" />
-                <h3 className="font-black text-sm text-slate-900 uppercase mb-1.5">{t.noItemsInCatalog}</h3>
-                <button
-                  onClick={handleOpenAddModal}
-                  className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition uppercase"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  {t.addFirstItem}
-                </button>
+              <div className="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center flex flex-col items-center">
+                <UtensilsCrossed className="w-8 h-8 text-blue-600 stroke-[2] mb-1.5" />
+                <h3 className="font-black text-sm text-slate-900 uppercase mb-1">{t.noItemsInCatalog}</h3>
+                <p className="text-xs font-bold text-slate-500 mb-3 max-w-xs">
+                  {isTa ? 'டேட்டாபேஸ் காலியாக உள்ளது. புதிய உணவைச் சேர்க்கலாம் அல்லது தரநிலை பட்டியலை ஏற்றலாம்.' : 'Database is empty. Add a new item or load standard cuts.'}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleResetChickenCuts}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition uppercase"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>{isTa ? 'கோழி பட்டியல் ஏற்று' : 'Load Standard Cuts'}</span>
+                  </button>
+                  <button
+                    onClick={handleOpenAddModal}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition uppercase"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    {t.addFirstItem}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -1017,6 +1075,43 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                 className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black uppercase shadow-sm cursor-pointer transition"
               >
                 {t.clearDatabaseNow}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: CLEAR ALL CATALOG ITEMS CONFIRMATION ================= */}
+      {isClearAllItemsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 animate-in fade-in duration-150">
+          <div className="w-full max-w-xs bg-white border-2 border-red-300 rounded-2xl p-4 text-slate-900 shadow-xl relative animate-in zoom-in-95 duration-150">
+            <div className="w-10 h-10 rounded-lg bg-red-100 border border-red-200 flex items-center justify-center text-red-600 mb-2">
+              <Trash2 className="w-5 h-5 stroke-[2.5]" />
+            </div>
+
+            <h3 className="text-base font-black text-slate-900 mb-1 uppercase">
+              {isTa ? 'அனைத்து பொருட்களையும் நீக்கவா?' : 'Clear All Items from Database?'}
+            </h3>
+            <p className="text-xs font-bold text-slate-600 mb-3.5 leading-relaxed">
+              {isTa
+                ? 'டேட்டாபேஸ் மற்றும் Firebase-ல் உள்ள அனைத்து உணவுப் பொருட்களும் முழுமையாக நீக்கப்படும். எப்போது வேண்டுமானாலும் புதிய பொருட்களைச் சேர்க்கலாம் அல்லது தரநிலை பட்டியலை மீட்டெடுக்கலாம்.'
+                : 'All items will be permanently cleared from the database and Firebase. You can add new items or restore standard cuts at any time.'}
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsClearAllItemsModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase cursor-pointer transition"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAllItemsConfirm}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black uppercase shadow-sm cursor-pointer transition"
+              >
+                {isTa ? 'ஆம், நீக்கு' : 'Yes, Clear All'}
               </button>
             </div>
           </div>

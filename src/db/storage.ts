@@ -2,6 +2,7 @@ import { CatalogItem, Bill, ShopSettings, BillItemSnapshot, OwnerSharedDailyRepo
 import {
   saveCatalogItemToFirestore,
   deleteCatalogItemFromFirestore,
+  clearAllCatalogItemsFromFirestore,
   saveBillToFirestore,
   saveShopSettingsToFirestore,
   saveDailyReportToFirestore,
@@ -76,9 +77,109 @@ function safeSet<T>(key: string, value: T): void {
   }
 }
 
+// Default Chicken / Meat items matching shop setup and screenshot
+export const DEFAULT_CHICKEN_CATALOG: CatalogItem[] = [
+  {
+    id: 'item_boneless',
+    name: 'போன்லெஸ் (எலும்பில்லா)',
+    price: 320,
+    weightKg: 1,
+    pricingType: 'gram',
+    createdAt: 1700000000000,
+    updatedAt: 1700000000000,
+  },
+  {
+    id: 'item_wings',
+    name: 'விங்ஸ் (இறக்கை)',
+    price: 200,
+    weightKg: 1,
+    pricingType: 'gram',
+    createdAt: 1700000001000,
+    updatedAt: 1700000001000,
+  },
+  {
+    id: 'item_liver',
+    name: 'ஈரல்',
+    price: 160,
+    weightKg: 1,
+    pricingType: 'gram',
+    createdAt: 1700000002000,
+    updatedAt: 1700000002000,
+  },
+  {
+    id: 'item_leg_boneless',
+    name: 'லெக் போன்லெஸ்',
+    price: 320,
+    weightKg: 1,
+    pricingType: 'gram',
+    createdAt: 1700000003000,
+    updatedAt: 1700000003000,
+  },
+  {
+    id: 'item_broiler',
+    name: 'பிராய்லர் கோழி',
+    price: 180,
+    weightKg: 1,
+    pricingType: 'gram',
+    createdAt: 1700000004000,
+    updatedAt: 1700000004000,
+  },
+  {
+    id: 'item_leg_piece',
+    name: 'லெக் பீஸ்',
+    price: 260,
+    weightKg: 1,
+    pricingType: 'gram',
+    createdAt: 1700000005000,
+    updatedAt: 1700000005000,
+  },
+  {
+    id: 'item_country_chicken',
+    name: 'நாட்டுக்கோழி',
+    price: 450,
+    weightKg: 1,
+    pricingType: 'gram',
+    createdAt: 1700000006000,
+    updatedAt: 1700000006000,
+  },
+  {
+    id: 'item_biryani',
+    name: 'சிக்கன் பிரியாணி',
+    price: 140,
+    weightKg: 0.5,
+    pricingType: 'fixed',
+    createdAt: 1700000007000,
+    updatedAt: 1700000007000,
+  },
+];
+
 // ================= CATALOG ITEMS (Database) =================
 export function getCatalogItems(): CatalogItem[] {
-  return safeGet<CatalogItem[]>(STORAGE_KEYS.ITEMS, []);
+  const raw = localStorage.getItem(STORAGE_KEYS.ITEMS);
+  if (raw === null) {
+    safeSet(STORAGE_KEYS.ITEMS, DEFAULT_CHICKEN_CATALOG);
+    return DEFAULT_CHICKEN_CATALOG;
+  }
+  try {
+    return JSON.parse(raw) as CatalogItem[];
+  } catch {
+    return [];
+  }
+}
+
+export function resetToDefaultChickenItems(): CatalogItem[] {
+  safeSet(STORAGE_KEYS.ITEMS, DEFAULT_CHICKEN_CATALOG);
+  DEFAULT_CHICKEN_CATALOG.forEach((item) => {
+    saveCatalogItemToFirestore(item).catch(() => {});
+  });
+  return DEFAULT_CHICKEN_CATALOG;
+}
+
+export function clearAllCatalogItems(): void {
+  safeSet(STORAGE_KEYS.ITEMS, []);
+  clearAllCatalogItemsFromFirestore().catch((err) => {
+    console.error('Failed to clear items from Firestore:', err);
+  });
 }
 
 export function detectItemWeightKg(itemName: string, customWeight?: number): number {
@@ -171,39 +272,14 @@ export function updateCatalogItem(
   return true;
 }
 
-export function updateCatalogItemPrice(id: string, newPrice: number): boolean {
-  const items = getCatalogItems();
-  const index = items.findIndex((it) => it.id === id);
-  if (index === -1) return false;
-
-  const current = items[index];
-  const validPrice = Math.max(0, Number(newPrice));
-  const updated: CatalogItem = {
-    ...current,
-    price: validPrice,
-    updatedAt: Date.now(),
-  };
-
-  const nextItems = [...items];
-  nextItems[index] = updated;
-  safeSet(STORAGE_KEYS.ITEMS, nextItems);
-  saveCatalogItemToFirestore(updated).catch((err) => {
-    console.error('Failed to sync updated item price to Firebase:', err);
-  });
-  return true;
-}
-
-export async function deleteCatalogItem(id: string): Promise<boolean> {
+export function deleteCatalogItem(id: string): boolean {
   const items = getCatalogItems();
   const filtered = items.filter((it) => it.id !== id);
   if (filtered.length === items.length) return false;
   safeSet(STORAGE_KEYS.ITEMS, filtered);
-  try {
-    await deleteCatalogItemFromFirestore(id);
-    console.log(`Successfully deleted item ${id} from Firestore database.`);
-  } catch (err) {
+  deleteCatalogItemFromFirestore(id).catch((err) => {
     console.error('Failed to delete item from Firebase:', err);
-  }
+  });
   return true;
 }
 

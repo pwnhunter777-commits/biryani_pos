@@ -7,7 +7,9 @@ import {
   subscribeToStore,
   searchBills,
   incrementBillPrintCount,
-  updateCatalogItemPrice,
+  deleteCatalogItem,
+  resetToDefaultChickenItems,
+  clearAllCatalogItems,
 } from '../db/storage';
 import { CatalogItem, ShopSettings, Bill, BillItemSnapshot } from '../types';
 import {
@@ -24,15 +26,9 @@ import {
   Eye,
   Trash2,
   Clock,
-  ShoppingBag,
   X,
-  Share2,
-  Smartphone,
-  Check,
   Scale,
-  Utensils,
-  Cloud,
-  Pencil,
+  RotateCcw,
 } from 'lucide-react';
 import { ReceiptView } from './ReceiptView';
 import { BluetoothModal } from './BluetoothModal';
@@ -47,18 +43,6 @@ import { Language, translations } from '../utils/translations';
 import { LanguageToggle } from './LanguageToggle';
 import { AppLogo } from './AppLogo';
 import { PinPad } from './PinPad';
-
-interface PricePromptState {
-  item: CatalogItem;
-  variantKey: string;
-  displayName: string;
-  defaultPrice: number;
-  weightKg: number;
-  variantLabel?: string;
-  cartKey: string;
-  isAlreadyInCart: boolean;
-  currentQty: number;
-}
 
 interface EmployeeViewProps {
   onLogout: () => void;
@@ -86,21 +70,15 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
   const [settings, setSettings] = useState<ShopSettings>(getShopSettings());
   const [savedBills, setSavedBills] = useState<Bill[]>([]);
 
-  // Page 1: Current Bill Cart State (Cart Key -> CartEntry)
-  const [cartMap, setCartMap] = useState<Record<string, {
-    cartKey: string;
-    itemId: string;
-    itemName: string;
-    displayName: string;
-    unitPrice: number;
-    weightKg: number;
-    quantity: number;
-    lineTotal: number;
-    variantKey?: string;
-    variantLabel?: string;
-  }>>({});
+  // Page 1: Billing Rows State (ItemId -> { kg: string, price: string })
+  // Exactly matching the screenshot: KG input, PRICE (₹) input, and calculated total box
+  const [rowMap, setRowMap] = useState<Record<string, { kg: string; price?: string }>>({});
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [billingSearchQuery, setBillingSearchQuery] = useState('');
+  const [itemToDelete, setItemToDelete] = useState<CatalogItem | null>(null);
+  const [isClearAllItemsModalOpen, setIsClearAllItemsModalOpen] = useState(false);
 
-  // Add Item modal state (for employees to quickly add items too)
+  // Add Item modal state
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   
   // Confirmed & Saved Bill Modal / Print Dialog
@@ -109,15 +87,6 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
   const [isPrinting, setIsPrinting] = useState(false);
   const [printStatusMessage, setPrintStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [billSaveError, setBillSaveError] = useState<string | null>(null);
-
-  // Price Prompt Modal State: pops up when food button is clicked to ask for price
-  const [pricePrompt, setPricePrompt] = useState<PricePromptState | null>(null);
-  const [pricePromptValue, setPricePromptValue] = useState<string>('');
-  const [pricePromptQty, setPricePromptQty] = useState<number>(1);
-
-  // Quick Edit Price Modal State for Employee
-  const [quickEditItem, setQuickEditItem] = useState<{ id: string; name: string; currentPrice: number } | null>(null);
-  const [quickEditPriceValue, setQuickEditPriceValue] = useState('');
 
   // Page 2: History Search & Selected Bill for Details / Reprint
   const [historySearchQuery, setHistorySearchQuery] = useState('');
@@ -156,348 +125,169 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
     };
   }, []);
 
-  // Cart operations (with Gram portions and Plate servings support)
-  const handleAddPortion = (item: CatalogItem, variantKey: string = 'fixed') => {
-    setCartMap((prev) => {
-      const next = { ...prev };
-      const cartKey = `${item.id}_${variantKey}`;
-      const existing = next[cartKey];
-
-      let unitPrice = item.price;
-      let weightKg = item.weightKg || 0.5;
-      let variantLabel = '';
-      let displayName = item.name;
-
-      if (item.pricingType === 'gram') {
-        if (variantKey === '100g') {
-          unitPrice = item.gramPrices?.p100g ?? item.price;
-          weightKg = 0.1;
-          variantLabel = '100gm';
-          displayName = `${item.name} (100gm)`;
-        } else if (variantKey === '250g') {
-          unitPrice = item.gramPrices?.p250g ?? (item.gramPrices?.p200g ? Math.round(item.gramPrices.p200g * 1.25) : Math.round(item.price * 2.5));
-          weightKg = 0.25;
-          variantLabel = '250gm';
-          displayName = `${item.name} (250gm)`;
-        } else if (variantKey === '200g') {
-          unitPrice = item.gramPrices?.p200g ?? Math.round(item.price * 2);
-          weightKg = 0.2;
-          variantLabel = '200gm';
-          displayName = `${item.name} (200gm)`;
-        } else if (variantKey === '500g') {
-          unitPrice = item.gramPrices?.p500g ?? Math.round(item.price * 5);
-          weightKg = 0.5;
-          variantLabel = '500gm';
-          displayName = `${item.name} (500gm)`;
-        } else if (variantKey === '1kg') {
-          unitPrice = item.gramPrices?.p1kg ?? Math.round(item.price * 10);
-          weightKg = 1.0;
-          variantLabel = '1kg';
-          displayName = `${item.name} (1kg)`;
-        }
-      } else if (item.pricingType === 'plate') {
-        const pLabel1 = '1 Plate';
-        const pLabel2 = '2 Plate';
-        const pLabel3 = '3 Plate';
-        const pLabel4 = '4 Plate';
-
-        if (variantKey === 'plate1') {
-          unitPrice = item.platePrices?.plate1 ?? item.price;
-          weightKg = 0.5;
-          variantLabel = pLabel1;
-          displayName = `${item.name} (${pLabel1})`;
-        } else if (variantKey === 'plate2') {
-          unitPrice = item.platePrices?.plate2 ?? item.price * 2;
-          weightKg = 1.0;
-          variantLabel = pLabel2;
-          displayName = `${item.name} (${pLabel2})`;
-        } else if (variantKey === 'plate3') {
-          unitPrice = item.platePrices?.plate3 ?? item.price * 3;
-          weightKg = 1.5;
-          variantLabel = pLabel3;
-          displayName = `${item.name} (${pLabel3})`;
-        } else if (variantKey === 'plate4') {
-          unitPrice = item.platePrices?.plate4 ?? item.price * 4;
-          weightKg = 2.0;
-          variantLabel = pLabel4;
-          displayName = `${item.name} (${pLabel4})`;
-        }
-      }
-
-      const newQty = (existing?.quantity || 0) + 1;
-      next[cartKey] = {
-        cartKey,
-        itemId: item.id,
-        itemName: item.name,
-        displayName,
-        unitPrice,
-        weightKg,
-        quantity: newQty,
-        lineTotal: newQty * unitPrice,
-        variantKey,
-        variantLabel,
-      };
-
-      return next;
-    });
+  // Update KG for an item row
+  const handleKgChange = (itemId: string, val: string) => {
+    // Only allow numbers and decimal point
+    const clean = val.replace(/[^0-9.]/g, '');
+    setActiveItemId(itemId);
+    setRowMap((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        kg: clean,
+      },
+    }));
   };
 
-  // Prompt price when food button is clicked:
-  // "if i click this a pop pu must come and ask for the price"
-  const handlePromptItemPrice = (item: CatalogItem, variantKey: string = 'fixed') => {
-    let unitPrice = item.price;
-    let weightKg = item.weightKg || 0.5;
-    let variantLabel = isTa ? 'நிலையான விலை' : 'Fixed';
-    let displayName = item.name;
-
-    if (item.pricingType === 'gram') {
-      if (variantKey === '100g') {
-        unitPrice = item.gramPrices?.p100g ?? item.price;
-        weightKg = 0.1;
-        variantLabel = '100gm';
-        displayName = `${item.name} (100gm)`;
-      } else if (variantKey === '250g') {
-        unitPrice = item.gramPrices?.p250g ?? (item.gramPrices?.p200g ? Math.round(item.gramPrices.p200g * 1.25) : Math.round(item.price * 2.5));
-        weightKg = 0.25;
-        variantLabel = '250gm';
-        displayName = `${item.name} (250gm)`;
-      } else if (variantKey === '200g') {
-        unitPrice = item.gramPrices?.p200g ?? Math.round(item.price * 2);
-        weightKg = 0.2;
-        variantLabel = '200gm';
-        displayName = `${item.name} (200gm)`;
-      } else if (variantKey === '500g') {
-        unitPrice = item.gramPrices?.p500g ?? Math.round(item.price * 5);
-        weightKg = 0.5;
-        variantLabel = '500gm';
-        displayName = `${item.name} (500gm)`;
-      } else if (variantKey === '1kg') {
-        unitPrice = item.gramPrices?.p1kg ?? Math.round(item.price * 10);
-        weightKg = 1.0;
-        variantLabel = '1kg';
-        displayName = `${item.name} (1kg)`;
-      }
-    } else if (item.pricingType === 'plate') {
-      if (variantKey === 'plate1') {
-        unitPrice = item.platePrices?.plate1 ?? item.price;
-        weightKg = 0.5;
-        variantLabel = '1 Plate';
-        displayName = `${item.name} (1 Plate)`;
-      } else if (variantKey === 'plate2') {
-        unitPrice = item.platePrices?.plate2 ?? item.price * 2;
-        weightKg = 1.0;
-        variantLabel = '2 Plate';
-        displayName = `${item.name} (2 Plate)`;
-      } else if (variantKey === 'plate3') {
-        unitPrice = item.platePrices?.plate3 ?? item.price * 3;
-        weightKg = 1.5;
-        variantLabel = '3 Plate';
-        displayName = `${item.name} (3 Plate)`;
-      } else if (variantKey === 'plate4') {
-        unitPrice = item.platePrices?.plate4 ?? item.price * 4;
-        weightKg = 2.0;
-        variantLabel = '4 Plate';
-        displayName = `${item.name} (4 Plate)`;
-      }
-    }
-
-    const cartKey = `${item.id}_${variantKey}`;
-    const altFixedKey = variantKey === 'fixed' ? item.id : null;
-    const existing = cartMap[cartKey] || (altFixedKey ? cartMap[altFixedKey] : undefined);
-    const isAlreadyInCart = !!(existing && existing.quantity > 0);
-
-    const initialPrice = existing ? existing.unitPrice : unitPrice;
-    const initialQty = existing ? existing.quantity : 1;
-
-    setPricePrompt({
-      item,
-      variantKey,
-      displayName,
-      defaultPrice: unitPrice,
-      weightKg,
-      variantLabel,
-      cartKey,
-      isAlreadyInCart,
-      currentQty: initialQty,
-    });
-    setPricePromptValue(initialPrice.toString());
-    setPricePromptQty(initialQty);
+  // Update Price (₹) for an item row
+  const handlePriceChange = (itemId: string, val: string) => {
+    const clean = val.replace(/[^0-9.]/g, '');
+    setActiveItemId(itemId);
+    setRowMap((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        kg: prev[itemId]?.kg || '',
+        price: clean,
+      },
+    }));
   };
 
-  const handleConfirmPricePrompt = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!pricePrompt) return;
-
-    const priceNum = parseFloat(pricePromptValue);
-    const validPrice = isNaN(priceNum) || priceNum < 0 ? pricePrompt.defaultPrice : priceNum;
-    const validQty = Math.max(1, pricePromptQty);
-
-    setCartMap((prev) => {
-      const next = { ...prev };
-      next[pricePrompt.cartKey] = {
-        cartKey: pricePrompt.cartKey,
-        itemId: pricePrompt.item.id,
-        itemName: pricePrompt.item.name,
-        displayName: pricePrompt.displayName,
-        unitPrice: validPrice,
-        weightKg: pricePrompt.weightKg,
-        quantity: validQty,
-        lineTotal: validQty * validPrice,
-        variantKey: pricePrompt.variantKey,
-        variantLabel: pricePrompt.variantLabel,
-      };
-      return next;
-    });
-
-    setPricePrompt(null);
-  };
-
-  const handleRemoveFromPrompt = () => {
-    if (!pricePrompt) return;
-    setCartMap((prev) => {
-      const next = { ...prev };
-      delete next[pricePrompt.cartKey];
-      if (pricePrompt.variantKey === 'fixed') {
-        delete next[pricePrompt.item.id];
-      }
-      return next;
-    });
-    setPricePrompt(null);
-  };
-
-  // Toggle portion logic fallback:
-  const handleTogglePortion = (item: CatalogItem, variantKey: string = 'fixed') => {
-    const cartKey = `${item.id}_${variantKey}`;
-    const altFixedKey = variantKey === 'fixed' ? item.id : null;
-    const existing = cartMap[cartKey] || (altFixedKey ? cartMap[altFixedKey] : undefined);
-
-    if (existing && existing.quantity > 0) {
-      // If I re-click it, it must remove from the bill!
-      setCartMap((prev) => {
-        const next = { ...prev };
-        delete next[cartKey];
-        if (altFixedKey) delete next[altFixedKey];
-        return next;
-      });
-    } else {
-      // If I click it, it must add to the bill
-      handleAddPortion(item, variantKey);
-    }
-  };
-
-  const handleDecrementPortion = (cartKey: string) => {
-    setCartMap((prev) => {
-      const next = { ...prev };
-      const existing = next[cartKey];
-      if (!existing) return prev;
-
-      if (existing.quantity <= 1) {
-        delete next[cartKey];
+  // Toggle item by clicking Box 3 (default to 1 KG if empty, or clear if already active)
+  const handleToggleItem = (itemId: string) => {
+    setActiveItemId(itemId);
+    setRowMap((prev) => {
+      const currentKg = prev[itemId]?.kg || '';
+      const num = parseFloat(currentKg);
+      if (num > 0) {
+        // Toggle off
+        return {
+          ...prev,
+          [itemId]: {
+            ...prev[itemId],
+            kg: '',
+          },
+        };
       } else {
-        const newQty = existing.quantity - 1;
-        next[cartKey] = {
-          ...existing,
-          quantity: newQty,
-          lineTotal: newQty * existing.unitPrice,
+        // Toggle on with 1 KG
+        return {
+          ...prev,
+          [itemId]: {
+            ...prev[itemId],
+            kg: '1',
+          },
         };
       }
-      return next;
     });
   };
 
-  const handleRemovePortion = (cartKey: string) => {
-    setCartMap((prev) => {
-      const next = { ...prev };
-      delete next[cartKey];
-      return next;
-    });
-  };
-
-  const handleClearCart = () => {
-    setCartMap({});
-  };
-
-  // Editable price per item in the Current Bill
-  const handleUpdateCartItemPrice = (cartKey: string, newUnitPrice: number) => {
-    setCartMap((prev) => {
-      const existing = prev[cartKey];
-      if (!existing) return prev;
-      const validPrice = Math.max(0, newUnitPrice);
-      return {
-        ...prev,
-        [cartKey]: {
-          ...existing,
-          unitPrice: validPrice,
-          lineTotal: validPrice * existing.quantity,
-        },
-      };
-    });
-  };
-
-  // Quick edit master price in catalog
-  const handleOpenQuickPriceEdit = (item: CatalogItem) => {
-    setQuickEditItem({ id: item.id, name: item.name, currentPrice: item.price });
-    setQuickEditPriceValue(item.price.toString());
-  };
-
-  const handleSaveQuickPriceEdit = () => {
-    if (!quickEditItem) return;
-    const priceNum = parseFloat(quickEditPriceValue);
-    if (!isNaN(priceNum) && priceNum >= 0) {
-      updateCatalogItemPrice(quickEditItem.id, priceNum);
-      // Also update any matching item currently in cart
-      setCartMap((prev) => {
+  // DEL button handler:
+  // If KG is typed or row is active -> clears the row from the current bill.
+  // If already empty -> opens prompt to delete from catalog.
+  const handleDelClick = (item: CatalogItem) => {
+    const current = rowMap[item.id];
+    const kgNum = parseFloat(current?.kg || '0');
+    if (kgNum > 0 || (current?.kg && current.kg.trim() !== '') || (current?.price && current.price.trim() !== '')) {
+      // Clear inputs for this item in current bill
+      setRowMap((prev) => {
         const next = { ...prev };
-        Object.keys(next).forEach((key) => {
-          if (next[key].itemId === quickEditItem.id && (!next[key].variantKey || next[key].variantKey === 'fixed')) {
-            next[key] = {
-              ...next[key],
-              unitPrice: priceNum,
-              lineTotal: priceNum * next[key].quantity,
-            };
-          }
-        });
+        delete next[item.id];
         return next;
       });
-      reloadData();
+      if (activeItemId === item.id) {
+        setActiveItemId(null);
+      }
+    } else {
+      // Prompt to delete item from catalog
+      setItemToDelete(item);
     }
-    setQuickEditItem(null);
   };
 
-  // Build cart item list with calculated line totals
-  const selectedCartItems = Object.values(cartMap).filter((entry) => entry.quantity > 0);
-  const totalBillAmount = selectedCartItems.reduce((sum, entry) => sum + entry.lineTotal, 0);
-  const totalBillItemsCount = selectedCartItems.reduce((sum, entry) => sum + entry.quantity, 0);
+  // Confirm deletion from catalog
+  const confirmDeleteItem = () => {
+    if (!itemToDelete) return;
+    deleteCatalogItem(itemToDelete.id);
+    setRowMap((prev) => {
+      const next = { ...prev };
+      delete next[itemToDelete.id];
+      return next;
+    });
+    setItemToDelete(null);
+    reloadData();
+  };
+
+  // Clear all active bill rows
+  const handleClearCart = () => {
+    setRowMap({});
+    setActiveItemId(null);
+  };
+
+  // Restore standard chicken cuts matching the screenshot
+  const handleResetChickenItems = () => {
+    resetToDefaultChickenItems();
+    reloadData();
+  };
+
+  // Clear all items from database (localStorage & Firestore)
+  const handleConfirmClearAllItems = () => {
+    clearAllCatalogItems();
+    setRowMap({});
+    setActiveItemId(null);
+    setIsClearAllItemsModalOpen(false);
+    reloadData();
+  };
+
+  // Build active bill items
+  const activeBillItems: BillItemSnapshot[] = [];
+  for (const item of items) {
+    const entry = rowMap[item.id];
+    const kgStr = entry?.kg?.trim() || '';
+    const kgNum = parseFloat(kgStr);
+    if (!kgStr || isNaN(kgNum) || kgNum <= 0) continue;
+
+    const priceNum = parseFloat(entry?.price || item.price.toString()) || item.price;
+    const lineTotal = Math.round(kgNum * priceNum);
+
+    activeBillItems.push({
+      itemId: item.id,
+      name: item.name,
+      unitPrice: priceNum,
+      quantity: 1,
+      lineTotal,
+      weightKg: kgNum,
+      totalWeightKg: kgNum,
+      variantKey: 'weight',
+      variantLabel: `${kgNum} KG`,
+    });
+  }
+
+  const totalBillAmount = activeBillItems.reduce((sum, it) => sum + it.lineTotal, 0);
+  const totalBillItemsCount = activeBillItems.length;
+  const totalBillWeightKg = Number(
+    activeBillItems.reduce((sum, it) => sum + (it.weightKg || 0), 0).toFixed(2)
+  );
 
   // Bill Confirmation and Saving
   const handleConfirmAndSaveBill = () => {
-    if (selectedCartItems.length === 0) {
+    if (activeBillItems.length === 0) {
       return;
     }
 
     try {
-      const snapshots: BillItemSnapshot[] = selectedCartItems.map((entry) => ({
-        itemId: entry.itemId,
-        name: entry.displayName,
-        unitPrice: entry.unitPrice,
-        quantity: entry.quantity,
-        lineTotal: entry.lineTotal,
-        weightKg: entry.weightKg,
-        totalWeightKg: Number((entry.quantity * entry.weightKg).toFixed(2)),
-        variantKey: entry.variantKey,
-        variantLabel: entry.variantLabel,
-      }));
+      const savedBill = createAndSaveBill(activeBillItems, employeePin);
 
-      const savedBill = createAndSaveBill(snapshots, employeePin);
-
-      setCartMap({});
+      setRowMap({});
+      setActiveItemId(null);
       setConfirmedBill(savedBill);
       setPrintStatusMessage(null);
       setIsPrintDialogOpen(true);
       setBillSaveError(null);
       reloadData();
     } catch (err: any) {
-      setBillSaveError(err?.message || (isTa ? 'பில் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.' : 'Could not save bill. Please try again.'));
+      setBillSaveError(
+        err?.message ||
+          (isTa ? 'பில் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.' : 'Could not save bill. Please try again.')
+      );
       setTimeout(() => setBillSaveError(null), 5000);
     }
   };
@@ -521,9 +311,11 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
     } else {
       setPrintStatusMessage({
         type: 'error',
-        text: result.error || (isTa
-          ? 'புளூடூத் அச்சிடலில் பிழை. பில்லை மீண்டும் அச்சிட முயற்சிக்கலாம்.'
-          : 'Bluetooth print failed. You can retry printing without creating a duplicate bill.'),
+        text:
+          result.error ||
+          (isTa
+            ? 'புளூடூத் அச்சிடலில் பிழை. பில்லை மீண்டும் அச்சிட முயற்சிக்கலாம்.'
+            : 'Bluetooth print failed. You can retry printing without creating a duplicate bill.'),
       });
     }
   };
@@ -551,15 +343,20 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
   // Filter bills for Page 2
   const displayedHistoryBills = searchBills(historySearchQuery);
 
+  // Filter items for Page 1
+  const displayedItems = items.filter((it) =>
+    it.name.toLowerCase().includes(billingSearchQuery.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-bold">
-      {/* Top App Bar - Small & Compact */}
-      <header className="sticky top-0 z-30 bg-white border-b-2 border-blue-200 px-2.5 py-1 shadow-xs">
+      {/* Top App Bar - Clean & Compact */}
+      <header className="sticky top-0 z-30 bg-white border-b-2 border-blue-200 px-2.5 py-1.5 shadow-xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <AppLogo size="sm" />
             <div className="flex items-center gap-1.5">
-              <h1 className="font-black text-sm tracking-wide text-slate-900 uppercase">
+              <h1 className="font-black text-sm sm:text-base tracking-wide text-slate-900 uppercase">
                 {settings.shopName && settings.shopName.trim() !== ''
                   ? settings.shopName
                   : t.appName}
@@ -576,7 +373,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
             {/* Bluetooth connection button */}
             <button
               onClick={() => setIsBluetoothModalOpen(true)}
-              className={`px-2 py-0.5 rounded-md border text-xs font-black flex items-center gap-1 transition cursor-pointer uppercase ${
+              className={`px-2 py-1 rounded-md border text-xs font-black flex items-center gap-1 transition cursor-pointer uppercase ${
                 bluetoothState.isConnected
                   ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
                   : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
@@ -593,10 +390,10 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
               </span>
             </button>
 
-            {/* Logout / Lock - Asks for Password / PIN */}
+            {/* Logout / Lock Button */}
             <button
               onClick={() => setIsLogoutPinModalOpen(true)}
-              className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 border border-slate-300 text-xs font-black flex items-center gap-1 transition cursor-pointer uppercase"
+              className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 border border-slate-300 text-xs font-black flex items-center gap-1 transition cursor-pointer uppercase"
               title={t.lock}
             >
               <LogOut className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -606,13 +403,12 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
         </div>
       </header>
 
-      {/* Main Page Navigation (Exactly Two Main Pages) - Compact with Bold Labels */}
+      {/* Main Page Navigation: BILLING and BILL HISTORY */}
       <nav className="bg-white border-b border-slate-200 px-2.5 shadow-xs">
         <div className="max-w-6xl mx-auto flex gap-1.5 py-1">
-          {/* Page 1 Button */}
           <button
             onClick={() => setCurrentPage('BILLING')}
-            className={`flex-1 sm:flex-none px-3.5 py-1 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer ${
+            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer ${
               currentPage === 'BILLING'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
@@ -621,10 +417,9 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
             <span>{t.page1Billing}</span>
           </button>
 
-          {/* Page 2 Button */}
           <button
             onClick={() => setCurrentPage('HISTORY')}
-            className={`flex-1 sm:flex-none px-3.5 py-1 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer ${
+            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer ${
               currentPage === 'HISTORY'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
@@ -635,218 +430,203 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
         </div>
       </nav>
 
-      {/* ================= PAGE 1: ITEMS LIST AND PRINT BILL ================= */}
+      {/* ================= PAGE 1: BILLING (EXACTLY MATCHING USER SCREENSHOT) ================= */}
       {currentPage === 'BILLING' && (
-        <main className="flex-1 max-w-6xl w-full mx-auto p-1.5 sm:p-2 grid grid-cols-1 lg:grid-cols-12 gap-1.5">
-          {/* Left Column: Items List (7 cols) - Small Compact Cards with Big Bold Text */}
-          <div className="lg:col-span-7 flex flex-col space-y-1.5">
-            <div className="flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setIsAddItemModalOpen(true)}
-                className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase flex items-center gap-1 shadow-xs cursor-pointer transition active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>{t.addItem}</span>
-              </button>
-            </div>
+        <main className="flex-1 max-w-6xl w-full mx-auto p-2 sm:p-3 grid grid-cols-1 lg:grid-cols-12 gap-3 pb-24 lg:pb-4">
+          {/* Left Column: Items List matching the screenshot (7 cols) */}
+          <div className="lg:col-span-7 flex flex-col space-y-2">
+            {/* Toolbar: Search, Add Item, Reset standard cuts */}
+            <div className="flex flex-wrap items-center justify-between gap-1.5 bg-white p-2 rounded-xl border border-slate-200 shadow-xs">
+              <div className="relative flex-1 min-w-[160px]">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400 stroke-[2.5]" />
+                <input
+                  type="text"
+                  placeholder={isTa ? 'உணவு தேட...' : 'Search items...'}
+                  value={billingSearchQuery}
+                  onChange={(e) => setBillingSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-2 py-1.5 text-xs font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                />
+              </div>
 
-            {/* If no items configured */}
-            {items.length === 0 ? (
-              <div className="bg-white border-2 border-dashed border-blue-200 rounded-lg p-3 text-center flex flex-col items-center">
-                <AlertCircle className="w-6 h-6 text-blue-600 stroke-[2.5] mb-1" />
-                <h3 className="font-black text-sm text-slate-900 uppercase">{t.noItemsConfigured}</h3>
-                <p className="text-xs font-bold text-slate-500 max-w-xs mt-0.5">
-                  {t.askOwnerToAddItems}
-                </p>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsClearAllItemsModalOpen(true)}
+                  title={isTa ? 'தரவுத்தளத்திலிருந்து அனைத்து பொருட்களையும் நீக்கு' : 'Clear all items from database'}
+                  className="px-2 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-black uppercase flex items-center gap-1 transition cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span className="hidden sm:inline">{isTa ? 'அனைத்தும் நீக்கு' : 'Clear All'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetChickenItems}
+                  title={isTa ? 'தரநிலை கோழி பொருட்கள்' : 'Reset Chicken Cuts'}
+                  className="px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black uppercase flex items-center gap-1 transition cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span className="hidden sm:inline">{isTa ? 'கோழி பட்டியல்' : 'Standard Cuts'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsAddItemModalOpen(true)}
-                  className="mt-2 px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase flex items-center gap-1 shadow-xs cursor-pointer transition"
+                  className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase flex items-center gap-1 shadow-xs cursor-pointer transition active:scale-95"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>{t.addFirstItem}</span>
+                  <span>{t.addItem}</span>
                 </button>
               </div>
+            </div>
+
+            {/* If no items found */}
+            {displayedItems.length === 0 ? (
+              <div className="bg-white border-2 border-dashed border-blue-200 rounded-2xl p-6 text-center flex flex-col items-center">
+                <AlertCircle className="w-7 h-7 text-blue-600 stroke-[2.5] mb-1.5" />
+                <h3 className="font-black text-sm text-slate-900 uppercase">
+                  {items.length === 0 ? t.noItemsConfigured : (isTa ? 'பொருட்கள் காணப்படவில்லை' : 'No items match')}
+                </h3>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={handleResetChickenItems}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase flex items-center gap-1 shadow-xs cursor-pointer transition"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>{isTa ? 'தரநிலை கோழி பட்டியல் ஏற்று' : 'Load Standard Cuts'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddItemModalOpen(true)}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase flex items-center gap-1 shadow-xs cursor-pointer transition"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>{t.addItem}</span>
+                  </button>
+                </div>
+              </div>
             ) : (
-              <div className="space-y-2.5">
-                {/* 1. Gram / Weight Foods */}
-                {items.some((i) => i.pricingType === 'gram') && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {items
-                      .filter((i) => i.pricingType === 'gram')
-                      .map((item) => {
-                        const portions = [
-                          { key: '100g', label: '100gm', price: item.gramPrices?.p100g ?? item.price },
-                          { key: '250g', label: '250gm', price: item.gramPrices?.p250g ?? (item.gramPrices?.p200g ? Math.round(item.gramPrices.p200g * 1.25) : Math.round(item.price * 2.5)) },
-                          { key: '500g', label: '500gm', price: item.gramPrices?.p500g ?? Math.round(item.price * 5) },
-                          { key: '1kg', label: '1 KG', price: item.gramPrices?.p1kg ?? Math.round(item.price * 10) },
-                        ];
+              /* The Exact Cards as shown in the uploaded screenshot */
+              <div className="space-y-2.5 max-h-[calc(100vh-170px)] overflow-y-auto pr-1">
+                {displayedItems.map((item) => {
+                  const entry = rowMap[item.id];
+                  const rowKg = entry?.kg !== undefined ? entry.kg : '';
+                  const rowPrice = entry?.price !== undefined ? entry.price : '';
+                  const kgNum = parseFloat(rowKg);
+                  const isKgValid = !isNaN(kgNum) && kgNum > 0;
 
-                        return (
-                          <div
-                            key={item.id}
-                            className="p-1.5 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between select-none"
-                          >
-                            <h4 className="font-black text-slate-900 text-sm sm:text-base uppercase leading-tight mb-1 truncate">
-                              {item.name}
-                            </h4>
+                  const unitPrice =
+                    rowPrice.trim() !== '' && !isNaN(parseFloat(rowPrice))
+                      ? parseFloat(rowPrice)
+                      : item.price;
 
-                            <div className="grid grid-cols-2 gap-1">
-                              {portions.map((g) => {
-                                const cartKey = `${item.id}_${g.key}`;
-                                const isAdded = (cartMap[cartKey]?.quantity || 0) > 0;
-                                return (
-                                  <button
-                                    key={g.key}
-                                    type="button"
-                                    onClick={() => handlePromptItemPrice(item, g.key)}
-                                    className={`p-1.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer active:scale-95 ${
-                                      isAdded
-                                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                                        : 'bg-emerald-50/70 hover:bg-emerald-100 text-emerald-950 border-emerald-200'
-                                    }`}
-                                  >
-                                    <div className="min-w-0">
-                                      <div className={`font-black text-xs sm:text-sm leading-none ${isAdded ? 'text-white' : 'text-emerald-900'}`}>
-                                        {g.label}
-                                      </div>
-                                      <div className={`text-xs sm:text-sm font-mono font-black mt-0.5 ${isAdded ? 'text-emerald-100' : 'text-emerald-700'}`}>
-                                        {isTa ? 'ரூ.' : 'Rs.'} {g.price}
-                                      </div>
-                                    </div>
-                                    {isAdded && (
-                                      <Check className="w-3.5 h-3.5 stroke-[3.5] text-white shrink-0 ml-1" />
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
+                  // Box 3 display value:
+                  // When KG is entered, calculate total = KG * Price
+                  // When KG is empty, show base price (as seen in Card 1: 320, Card 2: 200, Card 3: 160)
+                  const displayedTotal = isKgValid
+                    ? Math.round(kgNum * unitPrice)
+                    : unitPrice;
 
-                {/* 2. Plating Foods */}
-                {items.some((i) => i.pricingType === 'plate') && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {items
-                      .filter((i) => i.pricingType === 'plate')
-                      .map((item) => {
-                        const plates = [
-                          { key: 'plate1', label: isTa ? '1 தட்டு' : '1 Plate', price: item.platePrices?.plate1 ?? item.price },
-                          { key: 'plate2', label: isTa ? '2 தட்டு' : '2 Plate', price: item.platePrices?.plate2 ?? (item.price * 2) },
-                          { key: 'plate3', label: isTa ? '3 தட்டு' : '3 Plate', price: item.platePrices?.plate3 ?? (item.price * 3) },
-                          { key: 'plate4', label: isTa ? '4 தட்டு' : '4 Plate', price: item.platePrices?.plate4 ?? (item.price * 4) },
-                        ];
+                  // Active highlight:
+                  // If item has valid KG (> 0) OR is currently focused/selected (like Card 3 in screenshot with green border)
+                  const isItemActive = isKgValid || activeItemId === item.id;
 
-                        return (
-                          <div
-                            key={item.id}
-                            className="p-1.5 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between select-none"
-                          >
-                            <h4 className="font-black text-slate-900 text-sm sm:text-base uppercase leading-tight mb-1 truncate">
-                              {item.name}
-                            </h4>
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setActiveItemId(item.id)}
+                      className={`rounded-2xl p-3 sm:p-3.5 transition bg-white select-none ${
+                        isItemActive
+                          ? 'border border-emerald-400 ring-2 ring-emerald-100 shadow-sm'
+                          : 'border border-gray-200 hover:border-gray-300 shadow-xs'
+                      }`}
+                    >
+                      {/* Top Row: Bullet + Name in bold + DEL button on right */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {/* Circular bullet dot matching screenshot */}
+                          <span className="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block shrink-0" />
+                          <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug truncate">
+                            {item.name}
+                          </h3>
+                        </div>
 
-                            <div className="grid grid-cols-2 gap-1">
-                              {plates.map((p) => {
-                                const cartKey = `${item.id}_${p.key}`;
-                                const isAdded = (cartMap[cartKey]?.quantity || 0) > 0;
-                                return (
-                                  <button
-                                    key={p.key}
-                                    type="button"
-                                    onClick={() => handlePromptItemPrice(item, p.key)}
-                                    className={`p-1.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer active:scale-95 ${
-                                      isAdded
-                                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                                        : 'bg-indigo-50/70 hover:bg-indigo-100 text-indigo-950 border-indigo-200'
-                                    }`}
-                                  >
-                                    <div className="min-w-0">
-                                      <div className={`font-black text-xs sm:text-sm leading-none ${isAdded ? 'text-white' : 'text-indigo-900'}`}>
-                                        {p.label}
-                                      </div>
-                                      <div className={`text-xs sm:text-sm font-mono font-black mt-0.5 ${isAdded ? 'text-indigo-100' : 'text-indigo-700'}`}>
-                                        {isTa ? 'ரூ.' : 'Rs.'} {p.price}
-                                      </div>
-                                    </div>
-                                    {isAdded && (
-                                      <Check className="w-3.5 h-3.5 stroke-[3.5] text-white shrink-0 ml-1" />
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
+                        {/* DEL button with red trash icon and DEL text */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelClick(item);
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-red-200 bg-red-50/70 hover:bg-red-100 active:scale-95 text-red-600 font-bold text-xs uppercase flex items-center gap-1.5 transition cursor-pointer shrink-0"
+                          title={isKgValid ? (isTa ? 'பட்டியலிலிருந்து நீக்கு' : 'Remove from bill') : (isTa ? 'நீக்கு' : 'Delete item')}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>DEL</span>
+                        </button>
+                      </div>
 
-                {/* 3. Fixed Price Foods - Square Tiles (A bit smaller with bold & big text) */}
-                {items.some((i) => i.pricingType === 'fixed' || !i.pricingType) && (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5">
-                    {items
-                      .filter((i) => i.pricingType === 'fixed' || !i.pricingType)
-                      .map((item) => {
-                        const fixedCartKey = `${item.id}_fixed`;
-                        const fixedEntry = cartMap[fixedCartKey] || cartMap[item.id];
-                        const isAdded = (fixedEntry?.quantity || 0) > 0;
+                      {/* Bottom Row: 3 Boxes: [ KG ] | [ PRICE (₹) ] | [ 320 ] */}
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-2.5">
+                        {/* Box 1: KG Input */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="KG"
+                            value={rowKg}
+                            onChange={(e) => handleKgChange(item.id, e.target.value)}
+                            onFocus={() => setActiveItemId(item.id)}
+                            className="w-full text-center py-2 sm:py-2.5 px-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-bold focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none text-sm sm:text-base transition"
+                          />
+                        </div>
 
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => handlePromptItemPrice(item, 'fixed')}
-                            className={`aspect-square w-full rounded-xl border-2 p-1.5 flex flex-col justify-between items-center text-center cursor-pointer select-none active:scale-95 transition relative ${
-                              isAdded
-                                ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-400'
-                                : 'bg-white border-slate-300 text-slate-900 hover:border-blue-400 hover:bg-blue-50/40 shadow-xs'
-                            }`}
-                          >
-                            {/* Selected Indicator Badge in corner */}
-                            {isAdded && (
-                              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white text-blue-700 flex items-center justify-center shadow-xs">
-                                <Check className="w-3 h-3 stroke-[3.5]" />
-                              </span>
-                            )}
+                        {/* Box 2: PRICE (₹) Input */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="PRICE (₹)"
+                            value={rowPrice}
+                            onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                            onFocus={() => setActiveItemId(item.id)}
+                            className="w-full text-center py-2 sm:py-2.5 px-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-bold focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none text-sm sm:text-base transition"
+                          />
+                        </div>
 
-                            {/* Big Bold Item Name */}
-                            <div className="my-auto px-0.5 w-full flex items-center justify-center">
-                              <h4 className="font-black text-sm sm:text-base uppercase leading-tight line-clamp-2">
-                                {item.name}
-                              </h4>
-                            </div>
-
-                            {/* Big Bold Price */}
-                            <div
-                              className={`font-mono font-black text-sm sm:text-base leading-none tracking-tight pb-0.5 ${
-                                isAdded ? 'text-amber-200' : 'text-blue-700'
-                              }`}
-                            >
-                              {isTa ? 'ரூ.' : 'Rs.'} {item.price.toFixed(0)}
-                            </div>
-                          </button>
-                        );
-                      })}
-                  </div>
-                )}
+                        {/* Box 3: Total Amount Display Box */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleItem(item.id);
+                          }}
+                          className={`w-full text-center py-2 sm:py-2.5 px-2 rounded-xl font-black text-slate-900 text-base sm:text-lg flex items-center justify-center cursor-pointer select-none transition ${
+                            isKgValid
+                              ? 'bg-emerald-50 border border-emerald-300 text-emerald-950 font-black'
+                              : 'bg-slate-50/70 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                          title={isTa ? 'பில்லில் சேர்க்க/நீக்க தட்டவும்' : 'Tap to toggle 1 KG in bill'}
+                        >
+                          {displayedTotal}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* Right Column: Current Bill Slip (5 cols) - Small Compact Div with Big Bold Text */}
+          {/* Right Column: Current Bill Summary (5 cols) */}
           <div className="lg:col-span-5 flex flex-col">
-            <div className="bg-white border-2 border-blue-200 rounded-xl p-2.5 sticky top-14 shadow-sm flex flex-col">
-              <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 mb-1.5">
+            <div className="bg-white border-2 border-blue-200 rounded-2xl p-3 sticky top-14 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-2">
                 <div className="flex items-center gap-1.5">
                   <Receipt className="w-4 h-4 text-blue-600 stroke-[2.5]" />
                   <h3 className="font-black text-sm text-slate-900 uppercase">{t.currentBill}</h3>
                 </div>
-                {selectedCartItems.length > 0 && (
+                {activeBillItems.length > 0 && (
                   <button
                     onClick={handleClearCart}
                     className="text-xs font-black text-red-600 hover:text-red-800 flex items-center gap-1 transition cursor-pointer uppercase"
@@ -857,61 +637,52 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                 )}
               </div>
 
-              {/* Items in Current Bill - Compact Rows with Editable Price */}
-              <div className="flex-1 min-h-[120px] max-h-[220px] overflow-y-auto space-y-1.5 pr-1">
-                {selectedCartItems.length === 0 ? (
-                  <div className="h-full py-6 flex flex-col items-center justify-center text-center text-slate-400">
-                    <Receipt className="w-6 h-6 stroke-[2] text-slate-400 mb-1" />
-                    <span className="text-xs font-black text-slate-600 uppercase">{t.noItemsAdded}</span>
+              {/* Items in Current Bill */}
+              <div className="flex-1 min-h-[140px] max-h-[260px] overflow-y-auto space-y-1.5 pr-1">
+                {activeBillItems.length === 0 ? (
+                  <div className="h-full py-8 flex flex-col items-center justify-center text-center text-slate-400">
+                    <Receipt className="w-8 h-8 stroke-[1.5] text-slate-300 mb-1" />
+                    <span className="text-xs font-black text-slate-600 uppercase">
+                      {isTa ? 'பொருட்கள் சேர்க்கப்படவில்லை' : t.noItemsAdded}
+                    </span>
+                    <p className="text-[11px] font-bold text-slate-400 mt-1 max-w-[200px]">
+                      {isTa ? 'பொருளின் KG அல்லது தொகையை உள்ளிடவும்' : 'Enter KG or tap item box to add'}
+                    </p>
                   </div>
                 ) : (
-                  selectedCartItems.map((entry) => (
+                  activeBillItems.map((entry) => (
                     <div
-                      key={entry.cartKey}
-                      className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-between gap-1.5"
+                      key={entry.itemId}
+                      className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center justify-between gap-2"
                     >
-                      <div className="min-w-0 flex-1 pr-1">
+                      <div className="min-w-0 flex-1 truncate pr-1">
                         <div className="font-black text-slate-900 text-xs sm:text-sm uppercase truncate">
-                          {entry.displayName}
+                          {entry.name}
+                        </div>
+                        <div className="text-[11px] font-black text-slate-600 mt-0.5">
+                          {entry.weightKg} KG &times; {isTa ? 'ரூ.' : 'Rs.'} {entry.unitPrice}
                         </div>
                       </div>
 
-                      {/* Line Stepper & Actions */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <div className="flex items-center bg-white border border-slate-300 rounded-md">
-                          <button
-                            type="button"
-                            onClick={() => handleDecrementPortion(entry.cartKey)}
-                            className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-red-600 cursor-pointer"
-                          >
-                            <Minus className="w-3 h-3 stroke-[3]" />
-                          </button>
-                          <span className="font-mono font-black text-xs px-1 text-slate-900">
-                            {entry.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const itm = items.find((i) => i.id === entry.itemId);
-                              if (itm) handleAddPortion(itm, entry.variantKey || 'fixed');
-                            }}
-                            className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-blue-600 cursor-pointer"
-                          >
-                            <Plus className="w-3 h-3 stroke-[3]" />
-                          </button>
-                        </div>
-
-                        <div className="font-black text-blue-700 text-sm font-mono min-w-[50px] text-right">
-                          Rs. {entry.lineTotal.toFixed(0)}
+                      {/* Line Total & Remove */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="font-black text-blue-700 text-sm sm:text-base font-mono min-w-[55px] text-right">
+                          {isTa ? 'ரூ.' : 'Rs.'} {entry.lineTotal}
                         </div>
 
                         <button
                           type="button"
-                          onClick={() => handleRemovePortion(entry.cartKey)}
-                          className="text-slate-400 hover:text-red-600 p-0.5 rounded cursor-pointer"
+                          onClick={() => {
+                            setRowMap((prev) => {
+                              const next = { ...prev };
+                              delete next[entry.itemId];
+                              return next;
+                            });
+                          }}
+                          className="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 cursor-pointer"
                           title={isTa ? 'நீக்கு' : 'Remove'}
                         >
-                          <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <X className="w-4 h-4 stroke-[2.5]" />
                         </button>
                       </div>
                     </div>
@@ -919,38 +690,75 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                 )}
               </div>
 
-              {/* Calculations Box - Big Bold Text */}
-              <div className="mt-1.5 pt-1.5 border-t border-slate-200 space-y-0.5">
+              {/* Calculations Box - Bold & Clear */}
+              <div className="mt-2 pt-2 border-t border-slate-200 space-y-1">
                 <div className="flex justify-between text-xs font-black text-slate-600 uppercase">
-                  <span>{t.totalPortions}</span>
+                  <span>{isTa ? 'மொத்த எடை' : 'Total Weight'}</span>
+                  <span className="text-xs text-slate-900 font-mono">{totalBillWeightKg} KG</span>
+                </div>
+                <div className="flex justify-between text-xs font-black text-slate-600 uppercase">
+                  <span>{isTa ? 'பொருட்கள் எண்ணிக்கை' : t.totalPortions}</span>
                   <span className="text-xs text-slate-900">{totalBillItemsCount}</span>
                 </div>
 
-                <div className="flex justify-between items-baseline pt-1 border-t border-dashed border-slate-300">
+                <div className="flex justify-between items-baseline pt-1.5 border-t border-dashed border-slate-300">
                   <span className="text-sm font-black text-slate-800 uppercase">{t.billTotal}</span>
-                  <span className="text-2xl font-black text-blue-700 tracking-tight">
-                    Rs. {totalBillAmount.toFixed(0)}
+                  <span className="text-2xl sm:text-3xl font-black text-blue-700 tracking-tight font-mono">
+                    {isTa ? 'ரூ.' : 'Rs.'} {totalBillAmount}
                   </span>
                 </div>
               </div>
 
               {/* Error Notice */}
               {billSaveError && (
-                <div className="mt-2 p-2 rounded-lg bg-red-100 border border-red-300 text-red-700 text-xs font-black flex items-center gap-1.5 animate-in fade-in">
+                <div className="mt-2 p-2 rounded-lg bg-red-100 border border-red-300 text-red-700 text-xs font-black flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 text-red-600 shrink-0 stroke-[2.5]" />
                   <span>{billSaveError}</span>
                 </div>
               )}
 
-              {/* Action Button: Confirm & Save Bill */}
+              {/* Action Button: Confirm & Print Bill */}
               <button
                 type="button"
                 onClick={handleConfirmAndSaveBill}
-                disabled={selectedCartItems.length === 0}
-                className="w-full mt-2 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-1.5 cursor-pointer"
+                disabled={activeBillItems.length === 0}
+                className="w-full mt-2.5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-black text-base sm:text-lg uppercase shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 cursor-pointer"
               >
-                <CheckCircle2 className="w-5 h-5 stroke-[3]" />
-                <span>{t.confirmAndSaveBill}</span>
+                <Printer className="w-5 h-5 stroke-[2.5]" />
+                <span>{isTa ? 'பில் அச்சிடு' : t.confirmAndSaveBill}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Floating Mobile Sticky Bottom Bar */}
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t-2 border-blue-200 p-2.5 px-3 shadow-lg flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-black uppercase text-slate-500">
+                {totalBillItemsCount} {isTa ? 'பொருட்கள்' : 'items'} &bull; {totalBillWeightKg} KG
+              </div>
+              <div className="text-xl font-black text-blue-700 font-mono leading-none">
+                {isTa ? 'ரூ.' : 'Rs.'} {totalBillAmount}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {activeBillItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearCart}
+                  className="px-2.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-red-600 text-xs font-black uppercase transition cursor-pointer"
+                >
+                  {t.clear}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleConfirmAndSaveBill}
+                disabled={activeBillItems.length === 0}
+                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs sm:text-sm uppercase shadow-sm disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer className="w-4 h-4 stroke-[2.5]" />
+                <span>{isTa ? 'பிரிண்ட்' : t.print}</span>
               </button>
             </div>
           </div>
@@ -1063,115 +871,6 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
         </main>
       )}
 
-      {/* ================= MODAL: PRICE PROMPT POPUP (When food button is clicked) ================= */}
-      {pricePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
-          <div className="w-full max-w-xs bg-white border-2 border-blue-500 rounded-2xl p-4 text-slate-900 shadow-2xl relative animate-in zoom-in-95">
-            {/* Header: Item Name and Close button */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-3">
-              <h3 className="font-black text-base uppercase text-blue-700 leading-tight truncate pr-2">
-                {pricePrompt.displayName}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setPricePrompt(null)}
-                className="text-slate-400 hover:text-slate-800 p-0.5 rounded cursor-pointer shrink-0"
-              >
-                <X className="w-4 h-4 stroke-[3]" />
-              </button>
-            </div>
-
-            {/* Price Input Form */}
-            <form onSubmit={handleConfirmPricePrompt} className="space-y-3">
-              <div>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3 font-mono font-black text-slate-400 text-lg">
-                    {isTa ? 'ரூ.' : 'Rs.'}
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={pricePromptValue}
-                    onChange={(e) => setPricePromptValue(e.target.value)}
-                    className="w-full pl-12 pr-3 py-2 bg-slate-50 border-2 border-blue-400 focus:border-blue-600 rounded-xl text-2xl font-black text-slate-900 font-mono text-right focus:outline-none focus:bg-white shadow-inner"
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {/* Quantity Stepper */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-xs font-black text-slate-700 uppercase">
-                  {isTa ? 'எண்ணிக்கை' : 'Quantity'}:
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPricePromptQty((q) => Math.max(1, q - 1))}
-                    className="w-7 h-7 rounded-lg bg-white border border-slate-300 text-slate-700 hover:text-red-600 flex items-center justify-center font-black cursor-pointer shadow-2xs"
-                  >
-                    <Minus className="w-3.5 h-3.5 stroke-[3]" />
-                  </button>
-                  <span className="font-mono font-black text-base w-6 text-center text-slate-900">
-                    {pricePromptQty}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPricePromptQty((q) => q + 1)}
-                    className="w-7 h-7 rounded-lg bg-white border border-slate-300 text-slate-700 hover:text-blue-600 flex items-center justify-center font-black cursor-pointer shadow-2xs"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Line Total preview */}
-              <div className="flex justify-between items-baseline px-1 text-xs font-black">
-                <span className="text-slate-500 uppercase">{isTa ? 'பில் தொகை:' : 'Line Total:'}</span>
-                <span className="text-base font-black text-blue-700 font-mono">
-                  Rs. {((parseFloat(pricePromptValue) || 0) * pricePromptQty).toFixed(0)}
-                </span>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-1.5 pt-1">
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs uppercase flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 cursor-pointer transition"
-                >
-                  <CheckCircle2 className="w-4 h-4 stroke-[3]" />
-                  <span>
-                    {pricePrompt.isAlreadyInCart
-                      ? (isTa ? 'பில்லில் மாற்று' : 'Update in Bill')
-                      : (isTa ? 'பில்லில் சேர்' : 'Add to Bill')}
-                  </span>
-                </button>
-
-                {pricePrompt.isAlreadyInCart && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveFromPrompt}
-                    className="w-full py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-black text-xs uppercase flex items-center justify-center gap-1.5 border border-red-200 cursor-pointer transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>{isTa ? 'பில்லில் இருந்து நீக்கு' : 'Remove from Bill'}</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setPricePrompt(null)}
-                  className="w-full py-1 text-slate-500 hover:text-slate-800 text-xs font-black uppercase cursor-pointer"
-                >
-                  {t.cancel}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* ================= MODAL: PRINT / REPRINT DIALOG - Compact ================= */}
       {isPrintDialogOpen && confirmedBill && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
@@ -1282,69 +981,6 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
         </div>
       )}
 
-      {/* Quick Edit Master Price Modal for Employee */}
-      {quickEditItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
-          <div className="w-full max-w-xs bg-white border-2 border-blue-400 rounded-2xl p-4 text-slate-900 shadow-xl relative animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-2">
-              <div className="flex items-center gap-1.5">
-                <Pencil className="w-4 h-4 text-blue-600 stroke-[2.5]" />
-                <h4 className="font-black text-sm uppercase text-slate-900">
-                  {isTa ? 'உணவு விலையை மாற்றுக' : 'Edit Item Price'}
-                </h4>
-              </div>
-              <button
-                onClick={() => setQuickEditItem(null)}
-                className="text-slate-400 hover:text-slate-800 p-0.5 rounded cursor-pointer"
-              >
-                <X className="w-4 h-4 stroke-[3]" />
-              </button>
-            </div>
-
-            <p className="text-sm font-black uppercase text-blue-700 mb-3 truncate">
-              {quickEditItem.name}
-            </p>
-
-            <div className="mb-4">
-              <label className="block text-xs font-black text-slate-700 uppercase mb-1">
-                {isTa ? 'புதிய விற்பனை விலை (ரூ.)' : 'New Selling Price (Rs.)'}
-              </label>
-              <div className="relative flex items-center">
-                <span className="absolute left-3 text-sm font-black text-slate-500 font-mono">
-                  {isTa ? 'ரூ.' : 'Rs.'}
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={quickEditPriceValue}
-                  onChange={(e) => setQuickEditPriceValue(e.target.value)}
-                  className="w-full pl-11 pr-3 py-2 bg-slate-50 border-2 border-blue-400 focus:border-blue-600 rounded-lg text-lg font-black text-slate-900 font-mono focus:outline-none"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setQuickEditItem(null)}
-                className="flex-1 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-black uppercase cursor-pointer"
-              >
-                {t.cancel}
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveQuickPriceEdit}
-                className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase shadow-xs cursor-pointer"
-              >
-                {t.save}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Bluetooth Setup Modal */}
       <BluetoothModal
         isOpen={isBluetoothModalOpen}
@@ -1385,6 +1021,76 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
               onCancel={() => setIsLogoutPinModalOpen(false)}
               lang={lang}
             />
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: DELETE ITEM FROM MENU CONFIRMATION ================= */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
+          <div className="w-full max-w-xs bg-white rounded-2xl p-4 shadow-xl border-2 border-red-200">
+            <div className="flex items-center gap-2 mb-2 text-red-600">
+              <Trash2 className="w-5 h-5 stroke-[2.5]" />
+              <h3 className="font-black text-sm uppercase text-slate-900">
+                {isTa ? 'உணவு நீக்கு' : 'Delete Item'}
+              </h3>
+            </div>
+            <p className="text-xs font-bold text-slate-600 mb-3">
+              {isTa
+                ? `"${itemToDelete.name}" உணவை பட்டியலிலிருந்து நீக்க விரும்புகிறீர்களா?`
+                : `Are you sure you want to remove "${itemToDelete.name}" from the menu?`}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                className="flex-1 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase transition cursor-pointer"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteItem}
+                className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase transition shadow-xs cursor-pointer"
+              >
+                {t.delete}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: CLEAR ALL ITEMS FROM DATABASE CONFIRMATION ================= */}
+      {isClearAllItemsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
+          <div className="w-full max-w-xs bg-white rounded-2xl p-4 shadow-xl border-2 border-red-300">
+            <div className="flex items-center gap-2 mb-2 text-red-600">
+              <Trash2 className="w-5 h-5 stroke-[2.5]" />
+              <h3 className="font-black text-sm uppercase text-slate-900">
+                {isTa ? 'அனைத்து பொருட்களையும் நீக்கவா?' : 'Clear All Items from Database?'}
+              </h3>
+            </div>
+            <p className="text-xs font-bold text-slate-600 mb-3.5 leading-relaxed">
+              {isTa
+                ? 'தரவுத்தளத்தில் உள்ள அனைத்து உணவுப் பொருட்களும் முழுமையாக நீக்கப்படும். எப்போது வேண்டுமானாலும் புதிய பொருட்களைச் சேர்க்கலாம் அல்லது தரநிலை பட்டியலை மீட்டெடுக்கலாம்.'
+                : 'All items will be permanently cleared from the database. You can add new items or restore standard cuts at any time.'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsClearAllItemsModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase transition cursor-pointer"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearAllItems}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase transition shadow-xs cursor-pointer"
+              >
+                {isTa ? 'ஆம், நீக்கு' : 'Yes, Clear All'}
+              </button>
+            </div>
           </div>
         </div>
       )}

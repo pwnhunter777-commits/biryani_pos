@@ -79,7 +79,11 @@ export const ReceiptView: React.FC<ReceiptViewProps> = ({
                 Rs. {item.lineTotal.toFixed(0)}
               </span>
             </div>
-            {item.quantity > 1 || item.lineTotal !== item.unitPrice ? (
+            {item.weightKg ? (
+              <div className="text-[9px] font-black text-black pl-1">
+                {item.weightKg} KG x Rs. {item.unitPrice.toFixed(0)}
+              </div>
+            ) : item.quantity > 1 || item.lineTotal !== item.unitPrice ? (
               <div className="text-[9px] font-black text-black pl-1">
                 {item.quantity} x Rs. {item.unitPrice.toFixed(0)}
               </div>
