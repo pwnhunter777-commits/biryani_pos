@@ -12,6 +12,7 @@ import {
   getAllTimeSalesSummary,
   getSavedBills,
   getShopSettings,
+  updateShopSettings,
   subscribeToStore,
   clearDatabaseDailyData,
   getLast7DaysSalesData,
@@ -38,6 +39,14 @@ import {
   Scale,
   Cloud,
   RefreshCw,
+  Settings,
+  Save,
+  Store,
+  Shield,
+  Printer,
+  Check,
+  Phone,
+  FileText,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -71,11 +80,13 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
   const isTa = lang === 'ta';
   const currencySymbol = isTa ? 'ரூ.' : 'Rs.';
 
-  const [activeTab, setActiveTab] = useState<'ITEMS' | 'REPORTS' | 'BILLS_READONLY'>('ITEMS');
+  const [activeTab, setActiveTab] = useState<'ITEMS' | 'REPORTS' | 'BILLS_READONLY' | 'SETTINGS'>('ITEMS');
   
   // Data states
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [settings, setSettings] = useState<ShopSettings>(getShopSettings());
+  const [settingsForm, setSettingsForm] = useState<ShopSettings>(() => getShopSettings());
+  const [settingsSavedNotice, setSettingsSavedNotice] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [selectedBillForView, setSelectedBillForView] = useState<Bill | null>(null);
 
@@ -124,7 +135,17 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
   // Reload data from storage
   const reloadData = () => {
     setItems(getCatalogItems());
-    setSettings(getShopSettings());
+    const s = getShopSettings();
+    setSettings(s);
+    setSettingsForm(s);
+  };
+
+  const handleSaveSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated = updateShopSettings(settingsForm);
+    setSettings(updated);
+    setSettingsSavedNotice(true);
+    setTimeout(() => setSettingsSavedNotice(false), 3500);
   };
 
   useEffect(() => {
@@ -226,26 +247,26 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
   });
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-bold">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-bold w-full max-w-full overflow-x-hidden">
       {/* Top Navigation Bar - Small & Compact */}
-      <header className="sticky top-0 z-30 bg-white border-b-2 border-blue-200 px-2.5 py-1 shadow-xs">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-30 bg-white border-b-2 border-blue-200 px-2 sm:px-3 py-1.5 shadow-xs w-full max-w-full overflow-x-hidden">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <AppLogo size="sm" />
-            <div>
-              <h1 className="font-black text-sm tracking-wide text-slate-900 uppercase">
+            <div className="min-w-0">
+              <h1 className="font-black text-xs sm:text-sm tracking-wide text-slate-900 uppercase truncate">
                 {t.ownerPortal}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 shrink-0">
             {/* Firebase Cloud Sync Button */}
             <button
               onClick={handleSyncCloud}
               disabled={isSyncing}
               title={isTa ? 'எல்லா தரவையும் Firebase-ல் சேமிக்கவும்' : 'Save all data in Firebase'}
-              className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 text-xs font-black flex items-center gap-1 transition cursor-pointer disabled:opacity-50 uppercase"
+              className="px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 text-xs font-black flex items-center gap-1 transition cursor-pointer disabled:opacity-50 uppercase"
             >
               <Cloud className={`w-3.5 h-3.5 stroke-[2.5] ${isSyncing ? 'animate-pulse text-amber-600' : 'text-blue-600'}`} />
               <span className="hidden sm:inline">{isSyncing ? (isTa ? 'சேமிக்கிறது...' : 'Syncing...') : 'Firebase'}</span>
@@ -256,10 +277,10 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
             )}
             <button
               onClick={() => setIsExitPinModalOpen(true)}
-              className="px-2.5 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 border border-slate-300 text-xs font-black flex items-center gap-1 transition cursor-pointer uppercase"
+              className="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 border border-slate-300 text-xs font-black flex items-center gap-1 transition cursor-pointer uppercase"
             >
               <LogOut className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>{t.exit}</span>
+              <span className="hidden xs:inline sm:inline">{t.exit}</span>
             </button>
           </div>
         </div>
@@ -267,11 +288,11 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
         {/* Sync Toast Notification */}
         {syncMessage && (
           <div className="mt-1 px-3 py-1 bg-emerald-600 text-white text-xs font-black rounded flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-1">
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />
-              <span>{syncMessage}</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <CheckCircle2 className="w-3.5 h-3.5 stroke-[3] shrink-0" />
+              <span className="truncate">{syncMessage}</span>
             </div>
-            <button onClick={() => setSyncMessage(null)} className="text-emerald-100 hover:text-white p-0.5">
+            <button onClick={() => setSyncMessage(null)} className="text-emerald-100 hover:text-white p-0.5 shrink-0">
               <X className="w-3 h-3 stroke-[3]" />
             </button>
           </div>
@@ -279,11 +300,11 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
       </header>
 
       {/* Tabs - Small Compact Bar with Bold Labels */}
-      <div className="bg-white border-b border-slate-200 px-2 py-0.5 shadow-xs">
+      <div className="bg-white border-b border-slate-200 px-2 py-1 shadow-xs w-full max-w-full overflow-x-hidden">
         <div className="max-w-6xl mx-auto flex overflow-x-auto gap-1 py-0.5">
           <button
             onClick={() => setActiveTab('ITEMS')}
-            className={`px-2.5 py-1 rounded-md text-xs font-black flex items-center transition cursor-pointer whitespace-nowrap uppercase ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center transition cursor-pointer whitespace-nowrap uppercase shrink-0 ${
               activeTab === 'ITEMS'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
@@ -294,7 +315,7 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
 
           <button
             onClick={() => setActiveTab('REPORTS')}
-            className={`px-2.5 py-1 rounded-md text-xs font-black flex items-center transition cursor-pointer whitespace-nowrap uppercase ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center transition cursor-pointer whitespace-nowrap uppercase shrink-0 ${
               activeTab === 'REPORTS'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
@@ -305,13 +326,25 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
 
           <button
             onClick={() => setActiveTab('BILLS_READONLY')}
-            className={`px-2.5 py-1 rounded-md text-xs font-black flex items-center transition cursor-pointer whitespace-nowrap uppercase ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center transition cursor-pointer whitespace-nowrap uppercase shrink-0 ${
               activeTab === 'BILLS_READONLY'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
             }`}
           >
             <span>{t.billsArchive}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('SETTINGS')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1 transition cursor-pointer whitespace-nowrap uppercase shrink-0 ${
+              activeTab === 'SETTINGS'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>{t.shopSettings}</span>
           </button>
         </div>
       </div>
@@ -344,15 +377,6 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                   <span>{isTa ? 'அனைத்தும் நீக்கு' : 'Clear Database'}</span>
                 </button>
                 <button
-                  type="button"
-                  onClick={handleResetChickenCuts}
-                  title={isTa ? 'தரநிலை கோழி பட்டியல்' : 'Restore Standard Cuts'}
-                  className="px-2.5 py-1 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 font-black text-xs flex items-center gap-1 shadow-2xs cursor-pointer transition uppercase"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>{isTa ? 'கோழி பட்டியல்' : 'Standard Cuts'}</span>
-                </button>
-                <button
                   onClick={handleOpenAddModal}
                   className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition uppercase"
                 >
@@ -366,26 +390,14 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
             {items.length === 0 ? (
               <div className="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center flex flex-col items-center">
                 <UtensilsCrossed className="w-8 h-8 text-blue-600 stroke-[2] mb-1.5" />
-                <h3 className="font-black text-sm text-slate-900 uppercase mb-1">{t.noItemsInCatalog}</h3>
-                <p className="text-xs font-bold text-slate-500 mb-3 max-w-xs">
-                  {isTa ? 'டேட்டாபேஸ் காலியாக உள்ளது. புதிய உணவைச் சேர்க்கலாம் அல்லது தரநிலை பட்டியலை ஏற்றலாம்.' : 'Database is empty. Add a new item or load standard cuts.'}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleResetChickenCuts}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition uppercase"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>{isTa ? 'கோழி பட்டியல் ஏற்று' : 'Load Standard Cuts'}</span>
-                  </button>
-                  <button
-                    onClick={handleOpenAddModal}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition uppercase"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    {t.addFirstItem}
-                  </button>
-                </div>
+                <h3 className="font-black text-sm text-slate-900 uppercase mb-3">{t.noItemsInCatalog}</h3>
+                <button
+                  onClick={handleOpenAddModal}
+                  className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer transition uppercase"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  {t.addFirstItem}
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -395,79 +407,20 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                     className="bg-white border-2 border-slate-200/90 hover:border-blue-500 rounded-xl p-2.5 flex flex-col justify-between shadow-xs hover:shadow-sm transition-all"
                   >
                     <div>
-                      <div className="flex items-start justify-between gap-1 mb-1">
-                        <h4 className="font-black text-slate-900 text-base leading-tight uppercase truncate">
+                      <div className="flex items-center justify-between gap-1 mb-2">
+                        <h4 className="font-black text-slate-900 text-base sm:text-lg leading-tight uppercase truncate">
                           {item.name}
                         </h4>
-                        {item.pricingType === 'gram' && (
-                          <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">
-                            {t.gramType}
-                          </span>
-                        )}
-                        {item.pricingType === 'plate' && (
-                          <span className="text-[10px] font-black uppercase text-indigo-800 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded shrink-0">
-                            {t.plateType}
-                          </span>
-                        )}
-                        {(!item.pricingType || item.pricingType === 'fixed') && (
-                          <span className="text-[10px] font-black uppercase text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shrink-0">
-                            {t.fixedType}
-                          </span>
-                        )}
                       </div>
 
-                      {/* Tiers display */}
-                      {item.pricingType === 'gram' && item.gramPrices ? (
-                        <div className="grid grid-cols-2 gap-1 my-1.5 p-1.5 rounded-lg bg-blue-50/50 border border-blue-100 text-[11px] font-mono">
-                          <div className="flex justify-between px-1">
-                            <span className="text-slate-500 font-bold">100gm:</span>
-                            <span className="font-black text-blue-900">{currencySymbol} {item.gramPrices.p100g}</span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-slate-500 font-bold">{item.gramPrices.p250g !== undefined ? '250gm:' : '200gm:'}</span>
-                            <span className="font-black text-blue-900">{currencySymbol} {item.gramPrices.p250g ?? item.gramPrices.p200g}</span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-slate-500 font-bold">500gm:</span>
-                            <span className="font-black text-blue-900">{currencySymbol} {item.gramPrices.p500g}</span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-slate-500 font-bold">1 KG:</span>
-                            <span className="font-black text-blue-900">{currencySymbol} {item.gramPrices.p1kg}</span>
-                          </div>
-                        </div>
-                      ) : item.pricingType === 'plate' && item.platePrices ? (
-                        <div className="grid grid-cols-2 gap-1 my-1.5 p-1.5 rounded-lg bg-indigo-50/50 border border-indigo-100 text-[11px] font-mono">
-                          <div className="flex justify-between px-1">
-                            <span className="text-slate-500 font-bold">1 Plt:</span>
-                            <span className="font-black text-indigo-900">{currencySymbol} {item.platePrices.plate1}</span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-slate-500 font-bold">2 Plt:</span>
-                            <span className="font-black text-indigo-900">{currencySymbol} {item.platePrices.plate2}</span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-slate-500 font-bold">3 Plt:</span>
-                            <span className="font-black text-indigo-900">{currencySymbol} {item.platePrices.plate3}</span>
-                          </div>
-                          <div className="flex justify-between px-1">
-                            <span className="text-slate-500 font-bold">4 Plt:</span>
-                            <span className="font-black text-indigo-900">{currencySymbol} {item.platePrices.plate4}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-baseline justify-between my-1.5 px-0.5">
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t.fixedPrice}:</span>
-                            <span className="text-xl font-black text-blue-700 font-mono">
-                              {currencySymbol} {item.price.toFixed(0)}
-                            </span>
-                          </div>
-                          <span className="text-xs font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-mono">
-                            {item.weightKg ? `${item.weightKg} ${t.kgLabel}` : `0.5 ${t.kgLabel}`}
+                      <div className="flex items-baseline justify-between my-2 px-0.5">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-xs font-black text-slate-500 uppercase tracking-wider">{isTa ? 'விற்பனை விலை:' : 'Selling Price:'}</span>
+                          <span className="text-2xl font-black text-blue-700 font-mono">
+                            {currencySymbol} {item.price.toFixed(0)}
                           </span>
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-1.5">
@@ -509,20 +462,9 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                 <h2 className="text-base font-black text-slate-900 uppercase">
                   {t.salesSummaryAndReports}
                 </h2>
-                {(() => {
-                  const rInfo = getThreeDayResetInfo();
-                  return (
-                    <span className="text-[10px] sm:text-[11px] font-black text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-                      {isTa
-                        ? `3-நாள் சுழற்சி: நாள் ${rInfo.daysElapsed}/3 (தானியங்கி நீக்கம்)`
-                        : `3-Day Cycle: Day ${rInfo.daysElapsed} of 3 (Auto-clears)`}
-                    </span>
-                  );
-                })()}
               </div>
 
-              {/* Date Filter & Clear Daily Data */}
+              {/* Date Filter */}
               <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                 <input
                   type="date"
@@ -538,15 +480,6 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                     {t.today}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={handleOpenClearConfirm}
-                  className="px-2 py-0.5 rounded-md bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 text-xs font-black cursor-pointer uppercase flex items-center gap-1 transition"
-                  title={t.clearDatabaseNow}
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>{t.clearDatabaseNow}</span>
-                </button>
               </div>
             </div>
 
@@ -767,92 +700,6 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Item Sales Report Table - Compact Small Table, Big Bold Text */}
-            <div className="bg-white border-2 border-slate-200 rounded-lg p-2 shadow-xs">
-              <div className="flex items-center justify-between mb-1.5 pb-1.5 border-b border-slate-200">
-                <h3 className="font-black text-sm text-slate-900 uppercase">
-                  {t.itemSalesBreakdown}
-                </h3>
-                <span className="text-[11px] font-black text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded">
-                  {itemSalesReport.length} {t.itemsSoldPill}
-                </span>
-              </div>
-
-              {itemSalesReport.length === 0 ? (
-                <div className="py-3 text-center text-xs font-bold text-slate-400">
-                  {t.noItemsSoldOnDate}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b-2 border-slate-300 bg-slate-50 text-slate-700 text-xs uppercase font-black">
-                        <th className="py-1 px-1.5">{t.itemName}</th>
-                        <th className="py-1 px-1.5 text-center">{t.qty}</th>
-                        <th className="py-1 px-1.5 text-center">{t.totalKg}</th>
-                        <th className="py-1 px-1.5 text-right">{t.unitPrice}</th>
-                        <th className="py-1 px-1.5 text-right">{t.totalAmount}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {itemSalesReport.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-blue-50/50">
-                          <td className="py-1 px-1.5 text-slate-900 font-black text-sm uppercase">
-                            <div>{item.name}</div>
-                            <span className="text-[10px] text-slate-400 font-bold lowercase">
-                              ({item.weightKg} {t.kgLabel} / {isTa ? 'பங்கு' : 'portion'})
-                            </span>
-                          </td>
-                          <td className="py-1 px-1.5 text-center text-blue-800 font-black text-base font-mono">
-                            {item.quantity}
-                          </td>
-                          <td className="py-1 px-1.5 text-center font-mono">
-                            <span className="inline-block bg-emerald-50 text-emerald-800 border border-emerald-300 font-black px-1.5 py-0.5 rounded text-xs">
-                              {item.totalWeightKg.toFixed(2)} {t.kgLabel}
-                            </span>
-                          </td>
-                          <td className="py-1 px-1.5 text-right text-slate-700 font-bold text-xs font-mono">
-                            {currencySymbol} {item.unitPrice.toFixed(0)}
-                          </td>
-                          <td className="py-1 px-1.5 text-right text-blue-700 font-black text-base font-mono">
-                            {currencySymbol} {item.totalAmount.toFixed(0)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-slate-400 bg-blue-50 text-slate-900 font-black">
-                        <td className="py-1.5 px-1.5 uppercase text-sm">{t.total}</td>
-                        <td className="py-1.5 px-1.5 text-center text-blue-800 text-base font-mono">
-                          {salesSummary.totalItemsSold}
-                        </td>
-                        <td className="py-1.5 px-1.5 text-center font-mono">
-                          <span className="inline-block bg-emerald-600 text-white font-black px-2 py-0.5 rounded text-xs shadow-2xs">
-                            {salesSummary.totalKgSold.toFixed(2)} {t.kgLabel}
-                          </span>
-                        </td>
-                        <td className="py-1.5 px-1.5 text-right text-slate-400 font-mono">-</td>
-                        <td className="py-1.5 px-1.5 text-right text-blue-800 text-lg font-mono">
-                          {currencySymbol} {salesSummary.totalSales.toFixed(0)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* All-time Summary card - Compact */}
-            <div className="bg-white border border-slate-300 rounded-lg p-2 flex items-center justify-between text-xs font-bold text-slate-600">
-              <div>
-                <span className="text-slate-900 font-black uppercase">{t.allTime}</span>{' '}
-                {allTimeSummary.billCount} {t.totalLifetimeBills}
-              </div>
-              <div className="text-blue-700 font-black text-sm">
-                {t.lifetimeRevenue} {currencySymbol} {allTimeSummary.totalSales.toFixed(0)}
-              </div>
-            </div>
           </div>
         )}
 
@@ -899,35 +746,35 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                 {filteredBills.map((bill) => (
                   <div
                     key={bill.id}
-                    className="bg-white border-2 border-slate-200 hover:border-blue-400 rounded-lg p-2 flex items-center justify-between gap-1.5 transition shadow-xs"
+                    className="bg-white border-2 border-slate-200 hover:border-blue-400 rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition shadow-xs"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-mono font-black text-xs shrink-0">
                         {bill.billNumber}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
                           <span>{bill.dateString}</span>
                           <span>&bull;</span>
                           <span>{bill.timeString}</span>
                         </div>
-                        <div className="text-[11px] font-black text-slate-700">
+                        <div className="text-[11px] font-black text-slate-700 truncate">
                           {bill.items.length} {isTa ? 'உணவுகள்' : 'items'} &bull; {bill.totalQuantity} {isTa ? 'எண்ணிக்கை' : 'portions'}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <div className="text-base font-black text-blue-700">
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                      <div className="text-left sm:text-right">
+                        <div className="text-base sm:text-lg font-black text-blue-700 font-mono">
                           {currencySymbol} {bill.totalAmount.toFixed(0)}
                         </div>
                       </div>
                       <button
                         onClick={() => setSelectedBillForView(bill)}
-                        className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-100 text-blue-700 font-black text-xs border border-slate-300 flex items-center gap-0.5 cursor-pointer uppercase"
+                        className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-blue-100 text-blue-700 font-black text-xs border border-slate-300 flex items-center gap-1 cursor-pointer uppercase transition"
                       >
-                        <Eye className="w-3 h-3 stroke-[2.5]" />
+                        <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
                         <span>{t.view}</span>
                       </button>
                     </div>
@@ -935,6 +782,288 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ================= TAB 4: SHOP & BILLING SETTINGS ================= */}
+        {activeTab === 'SETTINGS' && (
+          <div className="space-y-3 pb-8">
+            {/* Header Banner */}
+            <div className="bg-white border border-blue-200 p-2.5 sm:p-3 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Settings className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">
+                    {t.shopConfiguration}
+                  </h2>
+                  <p className="text-[11px] font-bold text-slate-500">
+                    {isTa ? 'கடை பெயர், ரசீது மற்றும் பிரிண்டர் அமைப்புகளை நிர்வகிக்கவும்.' : 'Manage shop details, thermal receipts, and security PINs.'}
+                  </p>
+                </div>
+              </div>
+
+              {settingsSavedNotice && (
+                <div className="px-3 py-1.5 rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-black flex items-center gap-1.5 shadow-2xs animate-in fade-in shrink-0">
+                  <Check className="w-4 h-4 text-emerald-700 stroke-[3]" />
+                  <span>{t.settingsSaved}</span>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-3">
+              {/* Card 1: Shop Information */}
+              <div className="bg-white border-2 border-slate-200 rounded-xl p-3 sm:p-4 shadow-xs">
+                <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 mb-3">
+                  <Store className="w-4 h-4 text-blue-600 stroke-[2.5]" />
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase">
+                    {isTa ? 'கடை & முகவரி விவரங்கள்' : 'Shop & Address Details'}
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Shop Name */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-700 uppercase mb-1">
+                      {t.shopNameLabel}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={isTa ? 'எ.கா. சுவையான பிரியாணி கடை' : 'e.g. Star Biryani & Fast Food'}
+                      value={settingsForm.shopName}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, shopName: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition"
+                    />
+                  </div>
+
+                  {/* Tagline */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-700 uppercase mb-1">
+                      {t.taglineLabel}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={isTa ? 'எ.கா. சுவையான மற்றும் பாரம்பரிய பிரியாணி' : 'e.g. Traditional & Authentic Taste'}
+                      value={settingsForm.tagline || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, tagline: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition"
+                    />
+                  </div>
+
+                  {/* Phone */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-700 uppercase mb-1">
+                      {t.phoneLabel}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="9876543210"
+                      value={settingsForm.phone || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, phone: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition"
+                    />
+                  </div>
+
+                  {/* Address */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-700 uppercase mb-1">
+                      {isTa ? 'முகவரி' : 'Address'}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={isTa ? 'எ.கா. மெயின் ரோடு, சென்னை' : 'e.g. Main Road, City'}
+                      value={settingsForm.address || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, address: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition"
+                    />
+                  </div>
+
+                  {/* Receipt Footer Note */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-black text-slate-700 uppercase mb-1">
+                      {t.footerNoteLabel}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={isTa ? 'மீண்டும் வருக! நன்றி!' : 'Thank you for your visit!'}
+                      value={settingsForm.footerNote || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, footerNote: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Thermal Printer Paper Width */}
+              <div className="bg-white border-2 border-slate-200 rounded-xl p-3 sm:p-4 shadow-xs">
+                <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 mb-3">
+                  <Printer className="w-4 h-4 text-blue-600 stroke-[2.5]" />
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase">
+                    {t.paperWidthLabel}
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setSettingsForm({ ...settingsForm, paperWidth: '58mm' })}
+                    className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex items-center justify-between ${
+                      settingsForm.paperWidth === '58mm'
+                        ? 'border-blue-600 bg-blue-50/80 text-blue-900 ring-2 ring-blue-200'
+                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-black text-xs sm:text-sm uppercase">{t.pocketPos}</div>
+                      <div className="text-[11px] font-bold text-slate-500 mt-0.5">
+                        {isTa ? 'சிறிய புளூடூத் பிரிண்டர் (2 அங்குலம்)' : 'Standard handheld Bluetooth printer'}
+                      </div>
+                    </div>
+                    {settingsForm.paperWidth === '58mm' && (
+                      <Check className="w-5 h-5 text-blue-600 stroke-[3] shrink-0" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSettingsForm({ ...settingsForm, paperWidth: '80mm' })}
+                    className={`p-3 rounded-xl border-2 text-left transition cursor-pointer flex items-center justify-between ${
+                      settingsForm.paperWidth === '80mm'
+                        ? 'border-blue-600 bg-blue-50/80 text-blue-900 ring-2 ring-blue-200'
+                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-black text-xs sm:text-sm uppercase">{t.widePos}</div>
+                      <div className="text-[11px] font-bold text-slate-500 mt-0.5">
+                        {isTa ? 'பெரிய டெஸ்க்டாப் பிரிண்டர் (3 அங்குலம்)' : 'Wide counter desktop printer'}
+                      </div>
+                    </div>
+                    {settingsForm.paperWidth === '80mm' && (
+                      <Check className="w-5 h-5 text-blue-600 stroke-[3] shrink-0" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 3: Security & PINs */}
+              <div className="bg-white border-2 border-slate-200 rounded-xl p-3 sm:p-4 shadow-xs">
+                <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 mb-3">
+                  <Shield className="w-4 h-4 text-blue-600 stroke-[2.5]" />
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase">
+                    {isTa ? 'பாதுகாப்பு & பின் எண்கள்' : 'Security & PIN Access'}
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Owner PIN */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-700 uppercase mb-1">
+                      {t.ownerPinLabel}
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      inputMode="numeric"
+                      value={settingsForm.ownerPin}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, ownerPin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono font-black text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white tracking-widest text-center transition"
+                    />
+                    <span className="text-[10px] font-bold text-slate-400 mt-0.5 block">
+                      {isTa ? 'இயல்புநிலை: 8888' : 'Default: 8888'}
+                    </span>
+                  </div>
+
+                  {/* Employee PIN */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-700 uppercase mb-1">
+                      {t.employeePinLabel}
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      inputMode="numeric"
+                      value={settingsForm.employeePin}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, employeePin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono font-black text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white tracking-widest text-center transition"
+                    />
+                    <span className="text-[10px] font-bold text-slate-400 mt-0.5 block">
+                      {isTa ? 'இயல்புநிலை: 1234' : 'Default: 1234'}
+                    </span>
+                  </div>
+
+                  {/* Owner WhatsApp Number for daily reports */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-black text-slate-700 uppercase mb-1">
+                      {isTa ? 'உரிமையாளர் WhatsApp எண் (அறிக்கைகள் பெற)' : 'Owner WhatsApp Number (To receive reports)'}
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 stroke-[2.5]" />
+                      <input
+                        type="tel"
+                        placeholder="919876543210"
+                        value={settingsForm.ownerWhatsApp || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, ownerWhatsApp: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-2 text-xs sm:text-sm font-mono font-black text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 4: Database & Cloud Synchronization */}
+              <div className="bg-white border-2 border-slate-200 rounded-xl p-3 sm:p-4 shadow-xs">
+                <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 mb-2">
+                  <Cloud className="w-4 h-4 text-blue-600 stroke-[2.5]" />
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase">
+                    {isTa ? 'டேட்டாபேஸ் & மேகக்கணி ஒத்திசைவு' : 'Database & Cloud Storage'}
+                  </h3>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs space-y-1 mb-3">
+                  <div className="font-black text-blue-900 flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>{t.dailyDataResetLabel}</span>
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-600 leading-relaxed">
+                    {t.dailyResetNotice}
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSyncCloud}
+                    disabled={isSyncing}
+                    className="flex-1 py-2.5 px-3 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 text-xs font-black uppercase flex items-center justify-center gap-1.5 cursor-pointer transition disabled:opacity-50"
+                  >
+                    <Cloud className={`w-3.5 h-3.5 stroke-[2.5] ${isSyncing ? 'animate-pulse' : ''}`} />
+                    <span>{isSyncing ? (isTa ? 'ஒத்திசைக்கிறது...' : 'Syncing...') : (isTa ? 'Firebase-ல் உடனடியாக சேமிக்க' : 'Sync to Firebase Now')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenClearConfirm}
+                    className="flex-1 py-2.5 px-3 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black uppercase flex items-center justify-center gap-1.5 cursor-pointer transition"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>{t.clearAllBillsDataNow}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-black text-sm sm:text-base uppercase tracking-wide flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer transition"
+                >
+                  <Save className="w-4 h-4 stroke-[2.5]" />
+                  <span>{t.saveConfiguration}</span>
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </main>
@@ -1094,8 +1223,8 @@ export const OwnerView: React.FC<OwnerViewProps> = ({
             </h3>
             <p className="text-xs font-bold text-slate-600 mb-3.5 leading-relaxed">
               {isTa
-                ? 'டேட்டாபேஸ் மற்றும் Firebase-ல் உள்ள அனைத்து உணவுப் பொருட்களும் முழுமையாக நீக்கப்படும். எப்போது வேண்டுமானாலும் புதிய பொருட்களைச் சேர்க்கலாம் அல்லது தரநிலை பட்டியலை மீட்டெடுக்கலாம்.'
-                : 'All items will be permanently cleared from the database and Firebase. You can add new items or restore standard cuts at any time.'}
+                ? 'டேட்டாபேஸ் மற்றும் Firebase-ல் உள்ள அனைத்து உணவுப் பொருட்களும் முழுமையாக நீக்கப்படும். எப்போது வேண்டுமானாலும் புதிய பொருட்களைச் சேர்க்கலாம்.'
+                : 'All items will be permanently cleared from the database and Firebase. You can add new items at any time.'}
             </p>
 
             <div className="flex gap-2">

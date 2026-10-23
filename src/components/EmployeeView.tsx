@@ -125,10 +125,19 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
     };
   }, []);
 
+  // Robust decimal sanitization allowing only single dot
+  const sanitizeDecimal = (val: string) => {
+    let clean = val.replace(/[^0-9.]/g, '');
+    const parts = clean.split('.');
+    if (parts.length > 2) {
+      clean = parts[0] + '.' + parts.slice(1).join('');
+    }
+    return clean;
+  };
+
   // Update KG for an item row
   const handleKgChange = (itemId: string, val: string) => {
-    // Only allow numbers and decimal point
-    const clean = val.replace(/[^0-9.]/g, '');
+    const clean = sanitizeDecimal(val);
     setActiveItemId(itemId);
     setRowMap((prev) => ({
       ...prev,
@@ -141,7 +150,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
 
   // Update Price (₹) for an item row
   const handlePriceChange = (itemId: string, val: string) => {
-    const clean = val.replace(/[^0-9.]/g, '');
+    const clean = sanitizeDecimal(val);
     setActiveItemId(itemId);
     setRowMap((prev) => ({
       ...prev,
@@ -349,14 +358,14 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-bold">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-bold w-full max-w-full overflow-x-hidden">
       {/* Top App Bar - Clean & Compact */}
-      <header className="sticky top-0 z-30 bg-white border-b-2 border-blue-200 px-2.5 py-1.5 shadow-xs">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
+      <header className="sticky top-0 z-30 bg-white border-b-2 border-blue-200 px-2 sm:px-3 py-1.5 shadow-xs w-full max-w-full overflow-x-hidden">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <AppLogo size="sm" />
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-black text-sm sm:text-base tracking-wide text-slate-900 uppercase">
+            <div className="min-w-0">
+              <h1 className="font-black text-xs sm:text-base tracking-wide text-slate-900 uppercase truncate">
                 {settings.shopName && settings.shopName.trim() !== ''
                   ? settings.shopName
                   : t.appName}
@@ -364,7 +373,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 shrink-0">
             {/* Language Toggle */}
             {onLanguageChange && (
               <LanguageToggle currentLang={lang} onLanguageChange={onLanguageChange} />
@@ -404,28 +413,28 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
       </header>
 
       {/* Main Page Navigation: BILLING and BILL HISTORY */}
-      <nav className="bg-white border-b border-slate-200 px-2.5 shadow-xs">
+      <nav className="bg-white border-b border-slate-200 px-2 sm:px-3 shadow-xs w-full max-w-full overflow-x-hidden">
         <div className="max-w-6xl mx-auto flex gap-1.5 py-1">
           <button
             onClick={() => setCurrentPage('BILLING')}
-            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer text-center truncate ${
               currentPage === 'BILLING'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
             }`}
           >
-            <span>{t.page1Billing}</span>
+            <span className="truncate">{t.page1Billing}</span>
           </button>
 
           <button
             onClick={() => setCurrentPage('HISTORY')}
-            className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-black uppercase flex items-center justify-center transition cursor-pointer text-center truncate ${
               currentPage === 'HISTORY'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-700 hover:text-blue-700 hover:bg-blue-50'
             }`}
           >
-            <span>{t.page2History}</span>
+            <span className="truncate">{t.page2History}</span>
           </button>
         </div>
       </nav>
@@ -436,8 +445,8 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
           {/* Left Column: Items List matching the screenshot (7 cols) */}
           <div className="lg:col-span-7 flex flex-col space-y-2">
             {/* Toolbar: Search, Add Item, Reset standard cuts */}
-            <div className="flex flex-wrap items-center justify-between gap-1.5 bg-white p-2 rounded-xl border border-slate-200 shadow-xs">
-              <div className="relative flex-1 min-w-[160px]">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-xs">
+              <div className="relative flex-1 w-full">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400 stroke-[2.5]" />
                 <input
                   type="text"
@@ -448,7 +457,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                 />
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 justify-end shrink-0 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setIsClearAllItemsModalOpen(true)}
@@ -456,7 +465,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                   className="px-2 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-black uppercase flex items-center gap-1 transition cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span className="hidden sm:inline">{isTa ? 'அனைத்தும் நீக்கு' : 'Clear All'}</span>
+                  <span className="hidden xs:inline sm:inline">{isTa ? 'அனைத்தும் நீக்கு' : 'Clear All'}</span>
                 </button>
 
                 <button
@@ -466,7 +475,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                   className="px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black uppercase flex items-center gap-1 transition cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span className="hidden sm:inline">{isTa ? 'கோழி பட்டியல்' : 'Standard Cuts'}</span>
+                  <span className="hidden xs:inline sm:inline">{isTa ? 'கோழி பட்டியல்' : 'Standard Cuts'}</span>
                 </button>
 
                 <button
@@ -568,7 +577,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                       </div>
 
                       {/* Bottom Row: 3 Boxes: [ KG ] | [ PRICE (₹) ] | [ 320 ] */}
-                      <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-2.5">
+                      <div className="grid grid-cols-3 gap-1.5 sm:gap-3 mt-2.5">
                         {/* Box 1: KG Input */}
                         <div className="relative">
                           <input
@@ -578,7 +587,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                             value={rowKg}
                             onChange={(e) => handleKgChange(item.id, e.target.value)}
                             onFocus={() => setActiveItemId(item.id)}
-                            className="w-full text-center py-2 sm:py-2.5 px-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-bold focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none text-sm sm:text-base transition"
+                            className="w-full text-center py-2 sm:py-2.5 px-1 sm:px-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-bold focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none text-xs sm:text-base transition"
                           />
                         </div>
 
@@ -591,7 +600,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                             value={rowPrice}
                             onChange={(e) => handlePriceChange(item.id, e.target.value)}
                             onFocus={() => setActiveItemId(item.id)}
-                            className="w-full text-center py-2 sm:py-2.5 px-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-bold focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none text-sm sm:text-base transition"
+                            className="w-full text-center py-2 sm:py-2.5 px-1 sm:px-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-bold focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none text-xs sm:text-base transition"
                           />
                         </div>
 
@@ -601,7 +610,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                             e.stopPropagation();
                             handleToggleItem(item.id);
                           }}
-                          className={`w-full text-center py-2 sm:py-2.5 px-2 rounded-xl font-black text-slate-900 text-base sm:text-lg flex items-center justify-center cursor-pointer select-none transition ${
+                          className={`w-full text-center py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl font-black text-slate-900 text-sm sm:text-lg flex items-center justify-center cursor-pointer select-none transition ${
                             isKgValid
                               ? 'bg-emerald-50 border border-emerald-300 text-emerald-950 font-black'
                               : 'bg-slate-50/70 border border-slate-200 hover:bg-slate-100'
@@ -731,17 +740,17 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
           </div>
 
           {/* Floating Mobile Sticky Bottom Bar */}
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t-2 border-blue-200 p-2.5 px-3 shadow-lg flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] font-black uppercase text-slate-500">
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t-2 border-blue-200 p-2 sm:p-2.5 px-3 shadow-lg flex items-center justify-between gap-2 max-w-full overflow-hidden">
+            <div className="min-w-0 flex-1 truncate">
+              <div className="text-[10px] sm:text-[11px] font-black uppercase text-slate-500 truncate">
                 {totalBillItemsCount} {isTa ? 'பொருட்கள்' : 'items'} &bull; {totalBillWeightKg} KG
               </div>
-              <div className="text-xl font-black text-blue-700 font-mono leading-none">
+              <div className="text-lg sm:text-xl font-black text-blue-700 font-mono leading-none truncate">
                 {isTa ? 'ரூ.' : 'Rs.'} {totalBillAmount}
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               {activeBillItems.length > 0 && (
                 <button
                   type="button"
@@ -755,7 +764,7 @@ export const EmployeeView: React.FC<EmployeeViewProps> = ({
                 type="button"
                 onClick={handleConfirmAndSaveBill}
                 disabled={activeBillItems.length === 0}
-                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs sm:text-sm uppercase shadow-sm disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs sm:text-sm uppercase shadow-sm disabled:opacity-40 flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <Printer className="w-4 h-4 stroke-[2.5]" />
                 <span>{isTa ? 'பிரிண்ட்' : t.print}</span>

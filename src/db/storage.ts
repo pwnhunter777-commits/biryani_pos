@@ -735,14 +735,18 @@ export function initFirebaseSync(): void {
   // 2. Real-time Listeners from Firebase Firestore
   try {
     subscribeToFirestoreItems((firestoreItems) => {
-      if (firestoreItems && Array.isArray(firestoreItems) && firestoreItems.length > 0) {
-        const local = getCatalogItems();
-        const map = new Map(local.map((i) => [i.id, i]));
-        firestoreItems.forEach((item) => {
-          map.set(item.id, item);
-        });
-        safeSetWithoutNotify(STORAGE_KEYS.ITEMS, Array.from(map.values()));
-        notifyListeners();
+      if (firestoreItems && Array.isArray(firestoreItems)) {
+        if (firestoreItems.length > 0) {
+          safeSetWithoutNotify(STORAGE_KEYS.ITEMS, firestoreItems);
+          notifyListeners();
+        } else {
+          // If Firestore collection was cleared, reflect in local state if also empty
+          const raw = localStorage.getItem(STORAGE_KEYS.ITEMS);
+          if (raw !== null && raw === '[]') {
+            safeSetWithoutNotify(STORAGE_KEYS.ITEMS, []);
+            notifyListeners();
+          }
+        }
       }
     });
 

@@ -81,17 +81,17 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start antialiased selection:bg-blue-600 selection:text-white font-bold ${
+      className={`min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center justify-start antialiased selection:bg-blue-600 selection:text-white font-bold w-full max-w-full overflow-x-hidden ${
         lang === 'ta' ? 'lang-ta' : ''
       }`}
     >
       {/* Main Container */}
-      <div className="w-full max-w-full flex-1 flex flex-col">
+      <div className="w-full max-w-full flex-1 flex flex-col overflow-x-hidden">
         {/* ================= SCREEN 1: OPENING SCREEN ================= */}
         {screen === 'OPENING_SCREEN' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-3 text-center bg-gradient-to-b from-blue-50/80 via-white to-slate-50 relative">
+          <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-4 text-center bg-gradient-to-b from-blue-50/80 via-white to-slate-50 relative w-full max-w-full overflow-x-hidden">
             {/* Top Language Toggle */}
-            <div className="absolute top-3 right-3">
+            <div className="absolute top-3 right-3 z-10">
               <LanguageToggle currentLang={lang} onLanguageChange={handleLanguageChange} />
             </div>
 
@@ -101,7 +101,7 @@ export default function App() {
             </div>
 
             {/* Main Title - Bold and Big */}
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight mb-3">
+            <h1 className="text-xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight mb-3 px-3 break-words max-w-sm sm:max-w-md mx-auto">
               {settings.shopName && settings.shopName.trim() !== ''
                 ? settings.shopName
                 : t.appName}

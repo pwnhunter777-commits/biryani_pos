@@ -69,76 +69,78 @@ export const BluetoothModal: React.FC<BluetoothModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3">
-      <div className="w-full max-w-xs bg-white border-2 border-blue-200 rounded-xl shadow-lg p-3 text-slate-900 relative font-bold">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 overflow-y-auto">
+      <div className="w-full max-w-sm mx-auto bg-white border-2 border-blue-200 rounded-2xl shadow-xl p-3.5 sm:p-4 text-slate-900 relative font-bold my-auto overflow-hidden">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-slate-400 hover:text-slate-800 p-1 rounded-md hover:bg-slate-100 transition cursor-pointer"
+          className="absolute top-3 right-3 text-slate-400 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
         >
           <X className="w-4 h-4 stroke-[3]" />
         </button>
 
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+        <div className="flex items-center gap-2 mb-3 pr-8">
+          <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
             <Bluetooth className="w-5 h-5 stroke-[2.5]" />
           </div>
-          <div>
-            <h2 className="text-base font-black text-slate-900 uppercase">{t.thermalPrinter}</h2>
-            <p className="text-xs font-bold text-slate-500">{t.escposWireless}</p>
+          <div className="min-w-0">
+            <h2 className="text-base font-black text-slate-900 uppercase truncate">{t.thermalPrinter}</h2>
+            <p className="text-xs font-bold text-slate-500 truncate">{t.escposWireless}</p>
           </div>
         </div>
 
         {/* Status Card - Small Compact Div */}
         <div
-          className={`p-2.5 rounded-xl border-2 mb-3 flex items-center justify-between ${
+          className={`p-2.5 sm:p-3 rounded-xl border-2 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
             btState.isConnected
               ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
               : 'bg-slate-50 border-slate-300 text-slate-800'
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <div
-              className={`w-3 h-3 rounded-full ${
+              className={`w-3 h-3 rounded-full shrink-0 ${
                 btState.isConnected ? 'bg-emerald-600 animate-pulse' : 'bg-slate-400'
               }`}
             />
-            <div>
-              <div className="font-black text-sm uppercase">
+            <div className="min-w-0 flex-1">
+              <div className="font-black text-xs sm:text-sm uppercase truncate">
                 {btState.isConnected ? t.connected : t.notConnected}
               </div>
-              <div className="text-xs font-bold text-slate-600">
+              <div className="text-[11px] sm:text-xs font-bold text-slate-600 truncate">
                 {btState.deviceName || (btState.isSupported ? t.readyToPair : t.bluetoothUnavailable)}
               </div>
             </div>
           </div>
 
-          {btState.isConnected ? (
-            <button
-              onClick={handleDisconnect}
-              className="px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-800 border border-red-300 text-xs font-black flex items-center gap-1 cursor-pointer transition uppercase"
-            >
-              <PowerOff className="w-3.5 h-3.5 stroke-[2.5]" />
-              {t.disconnect}
-            </button>
-          ) : (
-            <button
-              onClick={handleConnect}
-              disabled={btState.isConnecting}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs uppercase flex items-center gap-1 cursor-pointer transition shadow-xs disabled:opacity-50"
-            >
-              {btState.isConnecting ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  {t.pairing}
-                </>
-              ) : (
-                <>
-                  <Bluetooth className="w-3.5 h-3.5 stroke-[2.5]" />
-                  {t.pairPrinter}
-                </>
-              )}
-            </button>
-          )}
+          <div className="shrink-0 self-end sm:self-center">
+            {btState.isConnected ? (
+              <button
+                onClick={handleDisconnect}
+                className="px-2.5 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-800 border border-red-300 text-xs font-black flex items-center gap-1 cursor-pointer transition uppercase"
+              >
+                <PowerOff className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>{t.disconnect}</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleConnect}
+                disabled={btState.isConnecting}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs uppercase flex items-center gap-1 cursor-pointer transition shadow-xs disabled:opacity-50"
+              >
+                {btState.isConnecting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{t.pairing}</span>
+                  </>
+                ) : (
+                  <>
+                    <Bluetooth className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>{t.pairPrinter}</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Error / Notice Display */}

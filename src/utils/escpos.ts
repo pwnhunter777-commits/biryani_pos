@@ -80,10 +80,45 @@ export function generateEscPosReceipt(bill: Bill, settings: ShopSettings): Uint8
   addLine(padColumns(`Bill No: ${bill.billNumber}`, `Date: ${bill.dateString}`, lineWidth));
   addLine(padColumns(`Time: ${bill.timeString}`, `Type: Dine/Take`, lineWidth));
 
+const TAMIL_ITEM_MAP: Record<string, string> = {
+  'போன்லெஸ் (எலும்பில்லா)': 'BONELESS CHICKEN',
+  'போன்லெஸ்': 'BONELESS CHICKEN',
+  'விங்ஸ் (இறக்கை)': 'CHICKEN WINGS',
+  'விங்ஸ்': 'CHICKEN WINGS',
+  'ஈரல்': 'CHICKEN LIVER',
+  'லெக் போன்லெஸ்': 'LEG BONELESS',
+  'பிராய்லர் கோழி': 'BROILER CHICKEN',
+  'பிராய்லர்': 'BROILER CHICKEN',
+  'லெக் பீஸ்': 'LEG PIECE',
+  'நாட்டுக்கோழி': 'COUNTRY CHICKEN',
+  'நாட்டு கோழி': 'COUNTRY CHICKEN',
+  'சிக்கன் பிரியாணி': 'CHICKEN BIRYANI',
+  'சிக்கன்': 'CHICKEN',
+  'மட்டன்': 'MUTTON',
+};
+
+function formatItemNameForPrinter(name: string): string {
+  const trimmed = (name || '').trim();
+  if (TAMIL_ITEM_MAP[trimmed]) {
+    return TAMIL_ITEM_MAP[trimmed];
+  }
+  for (const [tamil, eng] of Object.entries(TAMIL_ITEM_MAP)) {
+    if (trimmed.includes(tamil)) {
+      return eng;
+    }
+  }
+  // If contains English characters, extract them
+  const englishOnly = trimmed.replace(/[^\x20-\x7E]/g, '').trim();
+  if (englishOnly.length >= 2) {
+    return englishOnly.toUpperCase();
+  }
+  return trimmed.toUpperCase();
+}
+
   // Item rows
   for (const item of bill.items) {
     setBold(true);
-    addLine(item.name.toUpperCase());
+    addLine(formatItemNameForPrinter(item.name));
     setBold(false);
     if (item.weightKg) {
       const qtyPart = `  ${item.weightKg} KG x ${item.unitPrice.toFixed(0)}`;
